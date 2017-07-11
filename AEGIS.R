@@ -27,9 +27,9 @@ packages(SqlRender)
 
 ## select database
 #connectionDetails<-createConnectionDetails(dbms="sql server",
-#                                           server="128.1.99.53",
-#                                           user="JHcho",
-#                                           password="Survival12")
+#                                           server="server",
+#                                           user="user",
+#                                           password="pw")
 
 #connection<-connect(connectionDetails)
 
@@ -42,12 +42,12 @@ packages(SqlRender)
 
 ## select cohort
 connectionDetails<-createConnectionDetails(dbms="sql server",
-                                           server="128.1.99.53",
-                                           schema="NHIS_NSC.dbo",
-                                           user="JHCho",
-                                           password="Survival12")
-cdmDatabaseSchema <- "NHIS_NSC.dbo"
-targettab <- "cohort"
+                                           server="server",
+                                           schema="schema",
+                                           user="user",
+                                           password="pw")
+cdmDatabaseSchema <- "schema"
+targettab <- "table"
 cdmVersion <- "5" 
 connection<-connect(connectionDetails)
 
@@ -122,133 +122,133 @@ shinyApp(
       distinct <- input$distinct
       
       
-##Load cohort
+      ##Load cohort
       
       
       if( input$abs == "disabled"){
-      sql <-"
-      SELECT o.ID_0, o.ID_1, o.ID_2, count(o.subject_id) as outcome_count
+        sql <-"
+        SELECT o.ID_0, o.ID_1, o.ID_2, count(o.subject_id) as outcome_count
         FROM 
-	      (
-      		SELECT @distinct a.subject_id, a.cohort_definition_id, a.cohort_start_date, a.cohort_end_date, b.location_id, c.ID_0, c.ID_1, c.ID_2  
-      		FROM @cdmDatabaseSchema.@targettab a 
-      		LEFT JOIN @cdmDatabaseSchema.person b 
-      		ON a.subject_id = b.person_id 
-      		LEFT JOIN JHCho_EMR.dbo.gadm c 
-      		ON b.location_id = c.location_id
-      		WHERE a.cohort_definition_id = @ocdi
-	      )
-	      o
+        (
+        SELECT @distinct a.subject_id, a.cohort_definition_id, a.cohort_start_date, a.cohort_end_date, b.location_id, c.ID_0, c.ID_1, c.ID_2  
+        FROM @cdmDatabaseSchema.@targettab a 
+        LEFT JOIN @cdmDatabaseSchema.person b 
+        ON a.subject_id = b.person_id 
+        LEFT JOIN JHCho_EMR.dbo.gadm c 
+        ON b.location_id = c.location_id
+        WHERE a.cohort_definition_id = @ocdi
+        )
+        o
         where '@startdt' <= o.cohort_start_date
-          AND '@enddt' >= o.cohort_end_date
+        AND '@enddt' >= o.cohort_end_date
         GROUP BY o.ID_2, o.ID_1, o.ID_0
-      "
-      sql <- renderSql(sql,
-                      cdmDatabaseSchema=cdmDatabaseSchema,
-                      targettab=targettab,
-                      startdt=startdt,
-                      enddt=enddt,
-                      distinct=distinct,
-                      ocdi=ocdi)$sql
-      sql <- translateSql(sql,
-                          targetDialect=connectionDetails$dbms)$sql
-      cohort<- querySql(connection, sql)
+        "
+        sql <- renderSql(sql,
+                         cdmDatabaseSchema=cdmDatabaseSchema,
+                         targettab=targettab,
+                         startdt=startdt,
+                         enddt=enddt,
+                         distinct=distinct,
+                         ocdi=ocdi)$sql
+        sql <- translateSql(sql,
+                            targetDialect=connectionDetails$dbms)$sql
+        cohort<- querySql(connection, sql)
       }
       else
       {
-      sql <-"
-      SELECT t.cohort_definition_id, t.subject_id, t.cohort_start_date, t.cohort_end_date
-      INTO #target_cohort
-      FROM 
-      (
-      SELECT 
-      @distinct subject_id,
-      cohort_definition_id,
-      cohort_start_date,
-      cohort_end_date
-      FROM
-      @cdmDatabaseSchema.@targettab
-      ) t
-      WHERE cohort_definition_id = @tcdi
-      AND '@startdt' <= t.cohort_start_date
-      AND '@enddt' >= t.cohort_end_date
-      
-      --outcome cohort
-      SELECT o.cohort_definition_id, o.subject_id, o.cohort_start_date, o.cohort_end_date
-      INTO #outcome_cohort
-      FROM 
-      (
-      SELECT 
-      @distinct subject_id,
-      cohort_definition_id,
-      cohort_start_date,
-      cohort_end_date
-      FROM
-      @cdmDatabaseSchema.@targettab
-      ) o
-      WHERE cohort_definition_id = @ocdi
-      AND '@startdt' <= o.cohort_start_date
-      AND '@enddt' >= o.cohort_end_date
-      
-      SELECT o.subject_id, o.cohort_definition_id, o.cohort_start_date, o.cohort_end_date 
-      INTO #including_cohort
-      FROM #outcome_cohort o
-      LEFT JOIN #target_cohort t
-      ON t.subject_id = o.subject_id
-      WHERE t.cohort_start_date <= o.cohort_start_date
-      AND t.cohort_end_date >= o.cohort_end_date
-      
-      SELECT a.ID_0, a.ID_1, a.ID_2, a.target_count, b.outcome_count
-      FROM
-      (
-      SELECT c.ID_0, c.ID_1, c.ID_2, count(a.subject_id) AS target_count
-      FROM @cdmDatabaseSchema.@targettab a
-      LEFT JOIN
-      @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN JHCho_EMR.dbo.gadm c ON b.location_id = c.location_id
-      WHERE cohort_definition_id = @tcdi
-      GROUP BY c.ID_2, c.ID_1, c.ID_0
-      )
-      A LEFT JOIN
-      (
-      SELECT c.ID_0, c.ID_1, c.ID_2, count(a.subject_id) AS outcome_count
-      FROM #including_cohort a
-      LEFT JOIN
-      @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN JHCho_EMR.dbo.gadm c ON b.location_id = c.location_id
-      GROUP BY c.ID_2, c.ID_1, c.ID_0
-      )
-      B
-      ON a.ID_2 = b.ID_2
-      GROUP BY a.ID_2, a.ID_1, a.ID_0, a.target_count, b.outcome_count
-      ORDER BY id_2
-      
-      DROP TABLE #including_cohort
-      DROP TABLE #target_cohort
-      DROP TABLE #outcome_cohort
-      "
-      sql <- renderSql(sql,
-                        cdmDatabaseSchema=cdmDatabaseSchema,
-                        targettab=targettab,
-                        startdt=startdt,
-                        enddt=enddt,
-                        distinct=distinct,
-                        tcdi=tcdi,
-                        ocdi=ocdi)$sql
-      sql <- translateSql(sql,
-                          targetDialect=connectionDetails$dbms)$sql
-      cohort<- querySql(connection, sql)
+        sql <-"
+        SELECT t.cohort_definition_id, t.subject_id, t.cohort_start_date, t.cohort_end_date
+        INTO #target_cohort
+        FROM 
+        (
+        SELECT 
+        @distinct subject_id,
+        cohort_definition_id,
+        cohort_start_date,
+        cohort_end_date
+        FROM
+        @cdmDatabaseSchema.@targettab
+        ) t
+        WHERE cohort_definition_id = @tcdi
+        AND '@startdt' <= t.cohort_start_date
+        AND '@enddt' >= t.cohort_end_date
+        
+        --outcome cohort
+        SELECT o.cohort_definition_id, o.subject_id, o.cohort_start_date, o.cohort_end_date
+        INTO #outcome_cohort
+        FROM 
+        (
+        SELECT 
+        @distinct subject_id,
+        cohort_definition_id,
+        cohort_start_date,
+        cohort_end_date
+        FROM
+        @cdmDatabaseSchema.@targettab
+        ) o
+        WHERE cohort_definition_id = @ocdi
+        AND '@startdt' <= o.cohort_start_date
+        AND '@enddt' >= o.cohort_end_date
+        
+        SELECT o.subject_id, o.cohort_definition_id, o.cohort_start_date, o.cohort_end_date 
+        INTO #including_cohort
+        FROM #outcome_cohort o
+        LEFT JOIN #target_cohort t
+        ON t.subject_id = o.subject_id
+        WHERE t.cohort_start_date <= o.cohort_start_date
+        AND t.cohort_end_date >= o.cohort_end_date
+        
+        SELECT a.ID_0, a.ID_1, a.ID_2, a.target_count, b.outcome_count
+        FROM
+        (
+        SELECT c.ID_0, c.ID_1, c.ID_2, count(a.subject_id) AS target_count
+        FROM @cdmDatabaseSchema.@targettab a
+        LEFT JOIN
+        @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN JHCho_EMR.dbo.gadm c ON b.location_id = c.location_id
+        WHERE cohort_definition_id = @tcdi
+        GROUP BY c.ID_2, c.ID_1, c.ID_0
+        )
+        A LEFT JOIN
+        (
+        SELECT c.ID_0, c.ID_1, c.ID_2, count(a.subject_id) AS outcome_count
+        FROM #including_cohort a
+        LEFT JOIN
+        @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN JHCho_EMR.dbo.gadm c ON b.location_id = c.location_id
+        GROUP BY c.ID_2, c.ID_1, c.ID_0
+        )
+        B
+        ON a.ID_2 = b.ID_2
+        GROUP BY a.ID_2, a.ID_1, a.ID_0, a.target_count, b.outcome_count
+        ORDER BY id_2
+        
+        DROP TABLE #including_cohort
+        DROP TABLE #target_cohort
+        DROP TABLE #outcome_cohort
+        "
+        sql <- renderSql(sql,
+                         cdmDatabaseSchema=cdmDatabaseSchema,
+                         targettab=targettab,
+                         startdt=startdt,
+                         enddt=enddt,
+                         distinct=distinct,
+                         tcdi=tcdi,
+                         ocdi=ocdi)$sql
+        sql <- translateSql(sql,
+                            targetDialect=connectionDetails$dbms)$sql
+        cohort<- querySql(connection, sql)
       }
       
-##load GADM & getting map
-      gadm <- readRDS(paste0("D:\\JHCho\\17KOSMI\\KOR_adm", level,".rds")) # local change
+      ##load GADM & getting map
+      gadm <- readRDS(paste0("[file_path]", level,".rds")) # local change
       map <-ggmap(get_map(location = gadm@bbox, maptype='roadmap') )
       
-##tolower column names
+      ##tolower column names
       colnames(cohort) <- tolower(colnames(cohort))
-
-##remove NA
+      
+      ##remove NA
       countdf <- na.omit(cohort)
       
-##cohort extraction by level
+      ##cohort extraction by level
       if( input$abs == "disabled"){
         countdf_level <- sqldf(paste0("select id_",level, " as id, sum(outcome_count) as count from countdf group by id_", level, " order by id_", level))
       }
@@ -257,7 +257,7 @@ shinyApp(
         countdf_level <- sqldf(paste0("select id_",level, " as id, sum(outcome_count) as count, sum(target_count) as target_count from countdf group by id_", level, " order by id_", level))
       }
       
-##polygon data & proportion calc 
+      ##polygon data & proportion calc 
       mapdf <- data.frame()
       for(i in 1:length(countdf_level$id))
       {
@@ -276,10 +276,10 @@ shinyApp(
       }
       
       mapdf <- join(mapdf,countdf_level,by = "id", type="inner")
-
       
-            
-#plotting on kormap
+      
+      
+      #plotting on kormap
       
       if( input$abs == "disabled"){
         t <- max(countdf_level$count)
@@ -304,8 +304,8 @@ shinyApp(
         
         plot
       }
-    
+      
       
     })
   }
-)
+  )
