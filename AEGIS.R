@@ -1,9 +1,13 @@
-##install packages
+##install&require packages 
 packages<-function(x){
   x<-as.character(match.call()[[2]])
   if (!require(x,character.only=TRUE)){
     install.packages(pkgs=x,repos="http://cran.r-project.org")
     require(x,character.only=TRUE)
+  }
+  else
+  {
+    require(x,character.only=TRUE)  
   }
 }
 
@@ -24,12 +28,13 @@ packages(pkgconfig)
 packages(shinyjs)
 packages(shinythemes)
 packages(SqlRender)
+packages(CohortMethod)
 
-## select database
+## select database(Do not use this method in this version)
 #connectionDetails<-createConnectionDetails(dbms="sql server",
-#                                           server="server",
-#                                           user="user",
-#                                           password="pw")
+#                                           server="[server]",
+#                                           user="[user]",
+#                                           password="[pw]")
 
 #connection<-connect(connectionDetails)
 
@@ -42,12 +47,12 @@ packages(SqlRender)
 
 ## select cohort
 connectionDetails<-createConnectionDetails(dbms="sql server",
-                                           server="server",
-                                           schema="schema",
-                                           user="user",
-                                           password="pw")
-cdmDatabaseSchema <- "schema"
-targettab <- "table"
+                                           server="[server]",
+                                           schema="[schema]",
+                                           user="[user]",
+                                           password="[pw]")
+cdmDatabaseSchema <- "[cdmDatabaseSchema]"
+targettab <- "cohort"
 cdmVersion <- "5" 
 connection<-connect(connectionDetails)
 
@@ -187,8 +192,8 @@ shinyApp(
         @cdmDatabaseSchema.@targettab
         ) o
         WHERE cohort_definition_id = @ocdi
-        AND '@startdt' <= o.cohort_start_date
-        AND '@enddt' >= o.cohort_end_date
+        --AND '@startdt' <= o.cohort_start_date
+        --AND '@enddt' >= o.cohort_end_date
         
         SELECT o.subject_id, o.cohort_definition_id, o.cohort_start_date, o.cohort_end_date 
         INTO #including_cohort
@@ -196,7 +201,7 @@ shinyApp(
         LEFT JOIN #target_cohort t
         ON t.subject_id = o.subject_id
         WHERE t.cohort_start_date <= o.cohort_start_date
-        AND t.cohort_end_date >= o.cohort_end_date
+        AND t.cohort_end_date >= o.cohort_start_date
         
         SELECT a.ID_0, a.ID_1, a.ID_2, a.target_count, b.outcome_count
         FROM
@@ -239,7 +244,7 @@ shinyApp(
       }
       
       ##load GADM & getting map
-      gadm <- readRDS(paste0("[file_path]", level,".rds")) # local change
+      gadm <- readRDS(paste0("[path]/KOR_adm", level,".rds")) # local change
       map <-ggmap(get_map(location = gadm@bbox, maptype='roadmap') )
       
       ##tolower column names
@@ -250,18 +255,30 @@ shinyApp(
       
       ##cohort extraction by level
       if( input$abs == "disabled"){
-        countdf_level <- sqldf(paste0("select id_",level, " as id, sum(outcome_count) as count from countdf group by id_", level, " order by id_", level))
+        if( input$level == 1){
+          countdf_level <- sqldf(paste0("select id_1 as id_1, sum(outcome_count) as outcome_count from countdf group by id_1 order by id_1"))
+        }
+        else
+        {
+          countdf_level <- sqldf(paste0("select id_2 as id_2, sum(outcome_count) as outcome_count from countdf group by id_2 order by id_2"))
+        }
       }
       else
       {
-        countdf_level <- sqldf(paste0("select id_",level, " as id, sum(outcome_count) as count, sum(target_count) as target_count from countdf group by id_", level, " order by id_", level))
+        if( input$level == 1){
+          countdf_level <- sqldf(paste0("select id_1 as id_1, sum(outcome_count) as outcome_count, sum(target_count) as target_count from countdf group by id_1 order by id_1"))
+        }
+        else
+        {
+          countdf_level <- sqldf(paste0("select id_2 as id_2, sum(outcome_count) as outcome_count, sum(target_count) as target_count from countdf group by id_2 order by id_2"))
+        }
       }
       
       ##polygon data & proportion calc 
       mapdf <- data.frame()
       for(i in 1:length(countdf_level$id))
       {
-        countdf_level$target_count[i] <- (countdf_level$count[i] / countdf_level$target_count[i])*fraction
+        countdf_level$prop_count[i] <- (countdf_level$outcome_count[i] / countdf_level$target_count[i])*fraction
         idx<-as.numeric(as.character(countdf_level$id[i]))
         polygon <- gadm@polygons[[idx]]
         for(j in 1:length(polygon@Polygons))
@@ -275,34 +292,52 @@ shinyApp(
         }
       }
       
-      mapdf <- join(mapdf,countdf_level,by = "id", type="inner")
-      
-      
       
       #plotting on kormap
       
       if( input$abs == "disabled"){
-        t <- max(countdf_level$count)
+        if(input$level == 1){
+          mapdf$id_1 <- mapdf$id
+          mapdf <- join(mapdf,countdf_level,by = "id_1", type="inner")
+        }
+        else
+        {
+          mapdf$id_2 <- mapdf$id
+          mapdf <- join(mapdf,countdf_level,by = "id_2", type="inner")  
+        }
+        t <- max(countdf_level$outcome_count)
         
         plot <- map+
-          geom_polygon(data=mapdf,aes(x=long,y=lat,group=group,fill=count),alpha=0.8,colour="black",lwd=0.2)+
+          geom_polygon(data=mapdf,aes(x=long,y=lat,group=group,fill=outcome_count),alpha=0.8,colour="black",lwd=0.2)+
           scale_fill_gradientn(colours = rev(heat.colors(3)), limit = c(0,t)) + labs(fill=input$legend) +
           ggtitle(input$title) + theme(plot.title=element_text(face="bold", size=30, vjust=2, color="black")) +
           theme(legend.title=element_text(size=20, face="bold")) + theme(legend.text = element_text(size=15)) + theme(legend.key.width=unit(2, "cm"), legend.key.height = unit(2,"cm"))
         
         plot
+        
         
       }
       else
       {
-        t <- max(countdf_level$target_count)
+        if( input$level == 1){
+          mapdf$id_1 <- mapdf$id
+          mapdf <- join(mapdf,countdf_level,by = "id_1", type="inner")
+        }
+        else
+        {
+          mapdf$id_2 <- mapdf$id
+          mapdf <- join(mapdf,countdf_level,by = "id_2", type="inner")  
+        }
+        t <- max(countdf_level$prop_count)
         plot <- map+
-          geom_polygon(data=mapdf,aes(x=long,y=lat,group=group,fill=target_count),alpha=0.8,colour="black",lwd=0.2)+
+          geom_polygon(data=mapdf,aes(x=long,y=lat,group=group,fill=prop_count),alpha=0.8,colour="black",lwd=0.2)+
           scale_fill_gradientn(colours = rev(heat.colors(3)), limit = c(0,t)) + labs(fill=input$legend) +
           ggtitle(input$title) + theme(plot.title=element_text(face="bold", size=30, vjust=2, color="black")) +
           theme(legend.title=element_text(size=20, face="bold")) + theme(legend.text = element_text(size=15)) + theme(legend.key.width=unit(2, "cm"), legend.key.height = unit(2,"cm"))
         
         plot
+        
+        
       }
       
       
