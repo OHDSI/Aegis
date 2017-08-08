@@ -1,4 +1,7 @@
+#수정중~
+getwd()
 ##install&require packages 
+
 packages<-function(x){
   x<-as.character(match.call()[[2]])
   if (!require(x,character.only=TRUE)){
@@ -18,109 +21,186 @@ packages(maps)
 packages(mapdata)
 packages(mapproj)
 packages(ggmap)
-packages(RODBC)
 packages(dplyr)
 packages(plyr)
 packages(sqldf)
 packages(shiny)
-packages(bindrcpp) 
+packages(bindrcpp)
 packages(pkgconfig)
 packages(shinyjs)
-packages(shinythemes)
 packages(SqlRender)
-packages(CohortMethod)
-
-## select database(Do not use this method in this version)
-#connectionDetails<-createConnectionDetails(dbms="sql server",
-#                                           server="[server]",
-#                                           user="[user]",
-#                                           password="[pw]")
-
-#connection<-connect(connectionDetails)
-
-#sql <- "SELECT name FROM sys.databases"
-#sql <- renderSql(sql)$sql
-#sql <- translateSql(sql,
-#                    targetDialect=connectionDetails$dbms)$sql
-#database_list<- querySql(connection, sql)
+packages(DatabaseConnector)
+packages(shinydashboard)
 
 
-## select cohort
-connectionDetails<-createConnectionDetails(dbms="sql server",
-                                           server="[server]",
-                                           schema="[schema]",
-                                           user="[user]",
-                                           password="[pw]")
-cdmDatabaseSchema <- "[cdmDatabaseSchema]"
-targettab <- "cohort"
-cdmVersion <- "5" 
-connection<-connect(connectionDetails)
 
-sql <- "SELECT distinct cohort_definition_id FROM @cdmDatabaseSchema.@targettab"
-sql <- renderSql(sql,
-                 cdmDatabaseSchema=cdmDatabaseSchema,
-                 targettab=targettab)$sql
-sql <- translateSql(sql,
-                    targetDialect=connectionDetails$dbms)$sql
-cohort_list<- querySql(connection, sql)
-
-###########################
-
-
-##shiny UI
 shinyApp(
   
-  ui<-fluidPage(
-    theme= shinytheme("superhero"),
-    tags$head(tags$style((".shiny-output-error{color: #4E5D6C}"))),
-    shinyjs::useShinyjs(),
-    titlePanel("AEGIS"),
-    fluidRow(
-      column(3,
-             wellPanel(
-               selectInput("ocdi","Outcome Cohort",choices = c('',sort(cohort_list$COHORT_DEFINITION_ID)),selected = NULL)
-               ,hr(),
-               selectInput("tcdi","Target cohort",choices = c('',sort(cohort_list$COHORT_DEFINITION_ID)),selected = NULL)
-               ,hr()
-               ,dateRangeInput(inputId = "dateRange", label = "Select Windows",  start = "2002-01-01", end = "2013-12-31")
-               ,hr()
-               ,radioButtons("level","Administrative level",choices = c("Level 1" = 0, "Level 2" = 1, "Level 3" = 2),selected = 1)
-               ,radioButtons("abs","Select distribution options", c("Absolute" = "disabled","Propotion" = "enabled"),inline= TRUE)
-               ,radioButtons("distinct","Select distinct options", c("Yes" = "distinct","No" = "" ),inline= TRUE)
-               ,textInput("fraction","fraction",10000)
-               
-             ),
-             wellPanel(
-               textInput("title","title","")
-               ,textInput("legend","legend","")
-               ,submitButton("submit")
-             )
+  # Define UI for dataset viewer application
+  ui <- dashboardPage(
+    dashboardHeader(title = "AEGIS"),
+    dashboardSidebar(sidebarMenu(menuItem("DB Load",tabName= "db" ),
+                                 menuItem("control", tabName = "control" ),
+                                 menuItem("Export",tabName = "export" )
+                                 
+    )
+    ),
+    dashboardBody(tabItems(
+      tabItem(tabName = "db",
+              fluidRow(
+                titlePanel("DataBase Load"),
+                sidebarPanel(
+                  textInput("ip","IP","")
+                  ,textInput("usr","USER","")
+                  ,passwordInput("pw","PASSWORD","")
+                  #input text to db information
+                  ,actionButton("db_load","Load DB")
+                  ,hr()
+                  ,uiOutput("db_conn")
+                  ,actionButton("cohort_listup","Select DB")
+                ),
+                mainPanel(
+                  verbatimTextOutput("txt"),
+                  tableOutput("view")
+                )
+              )
       ),
-      column(9,
-             wellPanel(
-               plotOutput("plot")
-               
-             )
+      tabItem(tabName = "control",
+              fluidRow(
+                titlePanel("Plot control"),
+                sidebarPanel(
+                  uiOutput("cohort_ocdi")
+                  ,uiOutput("cohort_tcdi")
+                  ,hr()
+                  ,dateRangeInput(inputId = "dateRange", label = "Select Windows",  start = "2002-01-01", end = "2013-12-31")
+                  ,hr()
+                  ,radioButtons("level","Administrative level",choices = c("Level 1" = 0, "Level 2" = 1, "Level 3" = 2),selected = 1)
+                  ,radioButtons("abs","Select distribution options", choices = c("Absolute" = "disabled","Propotion" = "enabled"),selected = "disabled")
+                  ,radioButtons("distinct","Select distinct options", c("Yes" = "distinct","No" = "" ),inline= TRUE)
+                  ,textInput("fraction","fraction",100)
+                  ,textInput("title","title","")
+                  ,textInput("legend","legend","")
+                  ,actionButton("Submit","Submit") #Draw plot button
+                ),
+                mainPanel(
+                  verbatimTextOutput("test")
+                  ,plotOutput("plot")
+                  ,textOutput("text")
+                )
+              )
+      ),
+      tabItem(tabName ="export",
+              fluidRow(
+                titlePanel("Extraction plot & CSV file"),
+                sidebarPanel(
+                  downloadButton('plotex', 'plot export'),
+                  br(),hr(),
+                  downloadButton('csvex', 'CSV export')
+                ),
+                mainPanel(
+                  verbatimTextOutput("ex") # extraction success or fail
+                )
+              )
       )
-    ) 
-    
+    )
+    )
   ),
   
   
-  server <- function(input, output,session) {
+  
+  
+  server <- function(input, output,session){
     
     observe({
-      
-      shinyjs::toggleState("fraction",input$abs == "enabled")
-      shinyjs::toggleState("tcdi",input$abs == "enabled")
+      toggleState(id = "fraction", input$abs == "enabled")
+      toggleState(id = "tcdi", input$abs == "enabled")
       
     })
     
-    output$plot <- renderPlot({
+    db_conn <- eventReactive(input$db_load,{
       
+      ip <- input$ip
+      usr <- input$usr
+      pw <- input$pw
+      
+      connectionDetails<-createConnectionDetails(dbms="sql server",
+                                                 server=ip,
+                                                 user=usr,
+                                                 password=pw)
+      connection<-connect(connectionDetails)
+      
+      sql <- "SELECT name FROM sys.databases"
+      sql <- renderSql(sql)$sql
+      sql <- translateSql(sql,
+                          targetDialect=connectionDetails$dbms)$sql
+      db_list<- querySql(connection, sql)
+      
+    })
+    
+    
+    cohort_listup <- eventReactive(input$cohort_listup,{
+      
+      ip <- input$ip
+      usr <- input$usr
+      pw <- input$pw
+      schema <- input$db
+      
+      schema_dbo <- paste0(schema,'.dbo')
+      
+      connectionDetails<-createConnectionDetails(dbms="sql server",
+                                                 server=ip,
+                                                 schema=schema,
+                                                 user=usr,
+                                                 password=pw)
+      cdmDatabaseSchema <- schema_dbo
+      targettab <- "cohort"
+      cdmVersion <- "5" 
+      connection<-connect(connectionDetails)
+      
+      sql <- "SELECT distinct cohort_definition_id FROM @cdmDatabaseSchema.@targettab"
+      sql <- renderSql(sql,
+                       cdmDatabaseSchema=cdmDatabaseSchema,
+                       targettab=targettab)$sql
+      sql <- translateSql(sql,
+                          targetDialect=connectionDetails$dbms)$sql
+      cohort_list<- querySql(connection, sql)
+      
+    })
+    
+    
+    
+    output$db_conn <- renderUI({
+      db_list <- db_conn()
+      selectizeInput("db", "Select DB", choices = db_list[,1])
+    })
+    
+    
+    output$cohort_ocdi <- renderUI({
+      cohort_list <- cohort_listup()
+      selectInput("ocdi", "Select outcome cohort", choices = cohort_list[,1])
+    })
+    
+    output$cohort_tcdi <- renderUI({
+      cohort_list <- cohort_listup()
+      selectInput("tcdi", "Select target cohort", choices = cohort_list[,1])
+    })
+    
+    output$plot <- renderPlot ({
+      draw_plot()
+    })
+    
+    
+    #######################################
+    
+    draw_plot <- eventReactive(input$Submit,{
+      
+      schema <- input$db
+      ip <- input$ip
+      usr <- input$usr
+      pw <- input$pw
       level <- input$level
-      tcdi <- input$tcdi
       ocdi <- input$ocdi
+      tcdi <- input$tcdi
       fraction<-as.numeric(input$fraction)
       startdt <- input$dateRange[1]
       enddt <- input$dateRange[2]
@@ -128,8 +208,6 @@ shinyApp(
       
       
       ##Load cohort
-      
-      
       if( input$abs == "disabled"){
         sql <-"
         SELECT o.ID_0, o.ID_1, o.ID_2, count(o.subject_id) as outcome_count
@@ -148,6 +226,18 @@ shinyApp(
         AND '@enddt' >= o.cohort_end_date
         GROUP BY o.ID_2, o.ID_1, o.ID_0
         "
+        connectionDetails<-createConnectionDetails(dbms="sql server",
+                                                   server=ip,
+                                                   schema=schema,
+                                                   user=usr,
+                                                   password=pw)
+        
+        schema_dbo <- paste0(schema,'.dbo')
+        cdmDatabaseSchema <- schema_dbo
+        targettab <- "cohort"
+        cdmVersion <- "5" 
+        connection<-connect(connectionDetails)
+        
         sql <- renderSql(sql,
                          cdmDatabaseSchema=cdmDatabaseSchema,
                          targettab=targettab,
@@ -230,6 +320,17 @@ shinyApp(
         DROP TABLE #target_cohort
         DROP TABLE #outcome_cohort
         "
+        connectionDetails<-createConnectionDetails(dbms="sql server",
+                                                   server=ip,
+                                                   schema=schema,
+                                                   user=usr,
+                                                   password=pw)
+        
+        schema_dbo <- paste0(schema,'.dbo')
+        cdmDatabaseSchema <- schema_dbo
+        targettab <- "cohort"
+        cdmVersion <- "5" 
+        connection<-connect(connectionDetails)
         sql <- renderSql(sql,
                          cdmDatabaseSchema=cdmDatabaseSchema,
                          targettab=targettab,
@@ -244,7 +345,7 @@ shinyApp(
       }
       
       ##load GADM & getting map
-      gadm <- readRDS(paste0("[path]/KOR_adm", level,".rds")) # local change
+      gadm <- readRDS(paste0("D:/JHCho/17KOSMI/KOR_adm", level,".rds")) # local change
       map <-ggmap(get_map(location = gadm@bbox, maptype='roadmap') )
       
       ##tolower column names
@@ -336,11 +437,238 @@ shinyApp(
           theme(legend.title=element_text(size=20, face="bold")) + theme(legend.text = element_text(size=15)) + theme(legend.key.width=unit(2, "cm"), legend.key.height = unit(2,"cm"))
         
         plot
+      }
+    })
+    
+    output$plotex <- downloadHandler(
+      filename = function() {
+        paste("MAP ", "LEVEL=",as.character(input$level)," ",as.character(Sys.time()),".png", sep="")
+      },
+      content = function(file) {
+        ggsave(file, draw_plot(), dpi=450, width = 10, height=12, units="in")
+      }
+    )
+    
+    
+    output$csvex <- downloadHandler(
+      filename = function() { paste0("output.csv") },
+      content = function(file) 
         
+      {
+        schema <- input$db
+        ip <- input$ip
+        usr <- input$usr
+        pw <- input$pw
+        level <- input$level
+        ocdi <- input$ocdi
+        tcdi <- input$tcdi
+        fraction<-as.numeric(input$fraction)
+        startdt <- input$dateRange[1]
+        enddt <- input$dateRange[2]
+        distinct <- input$distinct
+        
+        
+        ##Load cohort
+        if( input$abs == "disabled"){
+          sql <-"
+          SELECT o.ID_0, o.ID_1, o.ID_2, count(o.subject_id) as outcome_count
+          FROM 
+          (
+          SELECT @distinct a.subject_id, a.cohort_definition_id, a.cohort_start_date, a.cohort_end_date, b.location_id, c.ID_0, c.ID_1, c.ID_2  
+          FROM @cdmDatabaseSchema.@targettab a 
+          LEFT JOIN @cdmDatabaseSchema.person b 
+          ON a.subject_id = b.person_id 
+          LEFT JOIN JHCho_EMR.dbo.gadm c 
+          ON b.location_id = c.location_id
+          WHERE a.cohort_definition_id = @ocdi
+          )
+          o
+          where '@startdt' <= o.cohort_start_date
+          AND '@enddt' >= o.cohort_end_date
+          GROUP BY o.ID_2, o.ID_1, o.ID_0
+          "
+          connectionDetails<-createConnectionDetails(dbms="sql server",
+                                                     server=ip,
+                                                     schema=schema,
+                                                     user=usr,
+                                                     password=pw)
+          
+          schema_dbo <- paste0(schema,'.dbo')
+          cdmDatabaseSchema <- schema_dbo
+          targettab <- "cohort"
+          cdmVersion <- "5" 
+          connection<-connect(connectionDetails)
+          
+          sql <- renderSql(sql,
+                           cdmDatabaseSchema=cdmDatabaseSchema,
+                           targettab=targettab,
+                           startdt=startdt,
+                           enddt=enddt,
+                           distinct=distinct,
+                           ocdi=ocdi)$sql
+          sql <- translateSql(sql,
+                              targetDialect=connectionDetails$dbms)$sql
+          cohort<- querySql(connection, sql)
+        }
+        else
+        {
+          sql <-"
+          SELECT t.cohort_definition_id, t.subject_id, t.cohort_start_date, t.cohort_end_date
+          INTO #target_cohort
+          FROM 
+          (
+          SELECT 
+          @distinct subject_id,
+          cohort_definition_id,
+          cohort_start_date,
+          cohort_end_date
+          FROM
+          @cdmDatabaseSchema.@targettab
+          ) t
+          WHERE cohort_definition_id = @tcdi
+          AND '@startdt' <= t.cohort_start_date
+          AND '@enddt' >= t.cohort_end_date
+          
+          --outcome cohort
+          SELECT o.cohort_definition_id, o.subject_id, o.cohort_start_date, o.cohort_end_date
+          INTO #outcome_cohort
+          FROM 
+          (
+          SELECT 
+          @distinct subject_id,
+          cohort_definition_id,
+          cohort_start_date,
+          cohort_end_date
+          FROM
+          @cdmDatabaseSchema.@targettab
+          ) o
+          WHERE cohort_definition_id = @ocdi
+          --AND '@startdt' <= o.cohort_start_date
+          --AND '@enddt' >= o.cohort_end_date
+          
+          SELECT o.subject_id, o.cohort_definition_id, o.cohort_start_date, o.cohort_end_date 
+          INTO #including_cohort
+          FROM #outcome_cohort o
+          LEFT JOIN #target_cohort t
+          ON t.subject_id = o.subject_id
+          WHERE t.cohort_start_date <= o.cohort_start_date
+          AND t.cohort_end_date >= o.cohort_start_date
+          
+          SELECT a.ID_0, a.ID_1, a.ID_2, a.target_count, b.outcome_count
+          FROM
+          (
+          SELECT c.ID_0, c.ID_1, c.ID_2, count(a.subject_id) AS target_count
+          FROM @cdmDatabaseSchema.@targettab a
+          LEFT JOIN
+          @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN JHCho_EMR.dbo.gadm c ON b.location_id = c.location_id
+          WHERE cohort_definition_id = @tcdi
+          GROUP BY c.ID_2, c.ID_1, c.ID_0
+          )
+          A LEFT JOIN
+          (
+          SELECT c.ID_0, c.ID_1, c.ID_2, count(a.subject_id) AS outcome_count
+          FROM #including_cohort a
+          LEFT JOIN
+          @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN JHCho_EMR.dbo.gadm c ON b.location_id = c.location_id
+          GROUP BY c.ID_2, c.ID_1, c.ID_0
+          )
+          B
+          ON a.ID_2 = b.ID_2
+          GROUP BY a.ID_2, a.ID_1, a.ID_0, a.target_count, b.outcome_count
+          ORDER BY id_2
+          
+          DROP TABLE #including_cohort
+          DROP TABLE #target_cohort
+          DROP TABLE #outcome_cohort
+          "
+          connectionDetails<-createConnectionDetails(dbms="sql server",
+                                                     server=ip,
+                                                     schema=schema,
+                                                     user=usr,
+                                                     password=pw)
+          
+          schema_dbo <- paste0(schema,'.dbo')
+          cdmDatabaseSchema <- schema_dbo
+          targettab <- "cohort"
+          cdmVersion <- "5" 
+          connection<-connect(connectionDetails)
+          sql <- renderSql(sql,
+                           cdmDatabaseSchema=cdmDatabaseSchema,
+                           targettab=targettab,
+                           startdt=startdt,
+                           enddt=enddt,
+                           distinct=distinct,
+                           tcdi=tcdi,
+                           ocdi=ocdi)$sql
+          sql <- translateSql(sql,
+                              targetDialect=connectionDetails$dbms)$sql
+          cohort<- querySql(connection, sql)
+        }
+        
+        ##load GADM & getting map
+        gadm <- readRDS(paste0("D:/JHCho/17KOSMI/KOR_adm", level,".rds")) # local change
+        map <-ggmap(get_map(location = gadm@bbox, maptype='roadmap') )
+        
+        ##tolower column names
+        colnames(cohort) <- tolower(colnames(cohort))
+        
+        ##remove NA
+        countdf <- na.omit(cohort)
+        
+        ##cohort extraction by level
+        if( input$abs == "disabled"){
+          if( input$level == 1){
+            countdf_level <- sqldf(paste0("select id_1 as id_1, sum(outcome_count) as outcome_count from countdf group by id_1 order by id_1"))
+          }
+          else
+          {
+            countdf_level <- sqldf(paste0("select id_2 as id_2, sum(outcome_count) as outcome_count from countdf group by id_2 order by id_2"))
+          }
+        }
+        else
+        {
+          if( input$level == 1){
+            countdf_level <- sqldf(paste0("select id_1 as id_1, sum(outcome_count) as outcome_count, sum(target_count) as target_count from countdf group by id_1 order by id_1"))
+          }
+          else
+          {
+            countdf_level <- sqldf(paste0("select id_2 as id_2, sum(outcome_count) as outcome_count, sum(target_count) as target_count from countdf group by id_2 order by id_2"))
+          }
+        }
+        
+        ##polygon data & proportion calc 
+        mapdf <- data.frame()
+        for(i in 1:length(countdf_level$id))
+        {
+          countdf_level$prop_count[i] <- (countdf_level$outcome_count[i] / countdf_level$target_count[i])*fraction
+          idx<-as.numeric(as.character(countdf_level$id[i]))
+          polygon <- gadm@polygons[[idx]]
+          for(j in 1:length(polygon@Polygons))
+          {
+            if(polygon@Polygons[[j]]@area<0.001)
+              next
+            tempdf <- fortify(polygon@Polygons[[j]])
+            tempdf$id <- idx
+            tempdf$group <- as.numeric(paste0(idx,".",j))
+            mapdf <- rbind(mapdf, tempdf)
+          }
+        }
+        
+        gadm_data <- gadm@data
+        
+        if(input$level == 1){
+          countdf_level$id_1 <- as.numeric(countdf_level$id_1)
+          output_csv <- left_join(gadm_data, countdf_level, by=c("ID_1" = "id_1"))
+          write.csv(output_csv, file)
+        }
+        else
+        {
+          countdf_level$id_2 <- as.numeric(countdf_level$id_2)
+          output_csv <- left_join(gadm_data, countdf_level, by=c("ID_2" = "id_2"))
+          write.csv(output_csv, file)
+        }
         
       }
-      
-      
-    })
-  }
-  )
+      )
+  })
+
