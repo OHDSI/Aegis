@@ -1,3 +1,6 @@
+##Setting
+GADMfolder<-"C:/Users/chan/git/ohdsi/Aegis"
+
 ##install&require packages
 
 packages<-function(x){
@@ -343,7 +346,7 @@ shinyApp(
       }
       
       ##load GADM & getting map
-      gadm <- readRDS(paste0("D:/JHCho/17KOSMI/KOR_adm", level,".rds")) # local change
+      gadm <- readRDS(file.path(GADMfolder,paste0("KOR_adm",level,".rds")))
       map <-ggmap(get_map(location = gadm@bbox, maptype='roadmap') )
       
       ##tolower column names
