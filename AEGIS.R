@@ -1,6 +1,4 @@
-#수정중~
-getwd()
-##install&require packages 
+##install&require packages
 
 packages<-function(x){
   x<-as.character(match.call()[[2]])
@@ -48,7 +46,7 @@ shinyApp(
     dashboardBody(tabItems(
       tabItem(tabName = "db",
               fluidRow(
-                titlePanel("DataBase Load"),
+                titlePanel("Database Load"),
                 sidebarPanel(
                   textInput("ip","IP","")
                   ,textInput("usr","USER","")
@@ -75,7 +73,7 @@ shinyApp(
                   ,dateRangeInput(inputId = "dateRange", label = "Select Windows",  start = "2002-01-01", end = "2013-12-31")
                   ,hr()
                   ,radioButtons("level","Administrative level",choices = c("Level 1" = 0, "Level 2" = 1, "Level 3" = 2),selected = 1)
-                  ,radioButtons("abs","Select distribution options", choices = c("Absolute" = "disabled","Propotion" = "enabled"),selected = "disabled")
+                  ,radioButtons("abs","Select distribution options", choices = c("Count of the number" = "disabled","Propotion" = "enabled"),selected = "disabled")
                   ,radioButtons("distinct","Select distinct options", c("Yes" = "distinct","No" = "" ),inline= TRUE)
                   ,textInput("fraction","fraction",100)
                   ,textInput("title","title","")
@@ -217,7 +215,7 @@ shinyApp(
         FROM @cdmDatabaseSchema.@targettab a 
         LEFT JOIN @cdmDatabaseSchema.person b 
         ON a.subject_id = b.person_id 
-        LEFT JOIN JHCho_EMR.dbo.gadm c 
+        LEFT JOIN gadm.dbo.gadm c 
         ON b.location_id = c.location_id
         WHERE a.cohort_definition_id = @ocdi
         )
@@ -299,7 +297,7 @@ shinyApp(
         SELECT c.ID_0, c.ID_1, c.ID_2, count(a.subject_id) AS target_count
         FROM @cdmDatabaseSchema.@targettab a
         LEFT JOIN
-        @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN JHCho_EMR.dbo.gadm c ON b.location_id = c.location_id
+        @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN gadm.dbo.gadm c ON b.location_id = c.location_id
         WHERE cohort_definition_id = @tcdi
         GROUP BY c.ID_2, c.ID_1, c.ID_0
         )
@@ -308,7 +306,7 @@ shinyApp(
         SELECT c.ID_0, c.ID_1, c.ID_2, count(a.subject_id) AS outcome_count
         FROM #including_cohort a
         LEFT JOIN
-        @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN JHCho_EMR.dbo.gadm c ON b.location_id = c.location_id
+        @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN gadm.dbo.gadm c ON b.location_id = c.location_id
         GROUP BY c.ID_2, c.ID_1, c.ID_0
         )
         B
@@ -478,7 +476,7 @@ shinyApp(
           FROM @cdmDatabaseSchema.@targettab a 
           LEFT JOIN @cdmDatabaseSchema.person b 
           ON a.subject_id = b.person_id 
-          LEFT JOIN JHCho_EMR.dbo.gadm c 
+          LEFT JOIN gadm.dbo.gadm c 
           ON b.location_id = c.location_id
           WHERE a.cohort_definition_id = @ocdi
           )
@@ -560,7 +558,7 @@ shinyApp(
           SELECT c.ID_0, c.ID_1, c.ID_2, count(a.subject_id) AS target_count
           FROM @cdmDatabaseSchema.@targettab a
           LEFT JOIN
-          @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN JHCho_EMR.dbo.gadm c ON b.location_id = c.location_id
+          @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN gadm.dbo.gadm c ON b.location_id = c.location_id
           WHERE cohort_definition_id = @tcdi
           GROUP BY c.ID_2, c.ID_1, c.ID_0
           )
@@ -569,7 +567,7 @@ shinyApp(
           SELECT c.ID_0, c.ID_1, c.ID_2, count(a.subject_id) AS outcome_count
           FROM #including_cohort a
           LEFT JOIN
-          @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN JHCho_EMR.dbo.gadm c ON b.location_id = c.location_id
+          @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN gadm.dbo.gadm c ON b.location_id = c.location_id
           GROUP BY c.ID_2, c.ID_1, c.ID_0
           )
           B
@@ -654,21 +652,95 @@ shinyApp(
           }
         }
         
+        #extraction csv file
         gadm_data <- gadm@data
+        colnames(gadm_data) <- tolower(colnames(gadm_data))
         
-        if(input$level == 1){
-          countdf_level$id_1 <- as.numeric(countdf_level$id_1)
-          output_csv <- left_join(gadm_data, countdf_level, by=c("ID_1" = "id_1"))
-          write.csv(output_csv, file)
+        if( input$abs == "disabled"){
+          if( input$level == 1){
+            countdf_level$id_1 <- as.numeric(countdf_level$id_1)
+            output_csv <- left_join(gadm_data, countdf_level, by=c("id_1" = "id_1"))
+            output_csv <- select(output_csv, -(hasc_1), -(ccn_1), -(cca_1), -(varname_1))
+            colnames(output_csv) <- c("objectid", "id_1", "ISO_nation_name", "name_1", "id_2", "name_2", "region_type_local_1", "region_type_eng_1", "region_name_local_1", "count")
+            for(j in 10)
+            {
+              for (i in 1:length(output_csv[,j]))
+              {
+                if(is.na(output_csv[i,j]))
+                {
+                  output_csv[i,j] <- c(0)
+                }
+              }
+            }
+            write.csv(output_csv, file)
+          }
+          else
+          {
+            countdf_level$id_2 <- as.numeric(countdf_level$id_2)
+            output_csv <- left_join(gadm_data, countdf_level, by=c("id_2" = "id_2"))
+            output_csv <- select(output_csv, -(hasc_2), -(ccn_2), -(cca_2), -(varname_2))
+            colnames(output_csv) <- c("objectid", "id_1", "ISO_nation_name", "name_1", "id_2", "name_2", "id_3", "name_3", "region_type_local_2", "region_type_eng_2", "region_name_local_2", "count")
+            for(j in 10)
+            {
+              for (i in 1:length(output_csv[,j]))
+              {
+                if(is.na(output_csv[i,j]))
+                {
+                  output_csv[i,j] <- c(0)
+                }
+              }
+            }
+            write.csv(output_csv, file)
+          }
         }
         else
         {
-          countdf_level$id_2 <- as.numeric(countdf_level$id_2)
-          output_csv <- left_join(gadm_data, countdf_level, by=c("ID_2" = "id_2"))
-          write.csv(output_csv, file)
+          if( input$level == 1){
+            countdf_level$id_1 <- as.numeric(countdf_level$id_1)
+            output_csv <- left_join(gadm_data, countdf_level, by=c("id_1" = "id_1"))
+            output_csv <- select(output_csv, -(hasc_1), -(ccn_1), -(cca_1), -(varname_1))
+            colnames(output_csv) <- c("objectid", "id_1", "ISO_nation_name", "name_1", "id_2", "name_2", "region_type_local_1", "region_type_eng_1", "region_name_local_1", "outcome_count", "target_count", "proportion")
+            for(j in 10:12)
+            {
+              for (i in 1:length(output_csv[,j]))
+              {
+                if(is.na(output_csv[i,j]))
+                {
+                  output_csv[i,j] <- c(0)
+                }
+              }
+            }
+            for (i in 1:length(output_csv$prop_count))
+            {
+              output_csv$prop_count[i] <- output_csv$prop_count[i] / fraction
+            }
+            write.csv(output_csv, file)
+          }
+          else
+          {
+            countdf_level$id_2 <- as.numeric(countdf_level$id_2)
+            output_csv <- left_join(gadm_data, countdf_level, by=c("id_2" = "id_2"))
+            output_csv <- select(output_csv, -(hasc_2), -(ccn_2), -(cca_2), -(varname_2))
+            colnames(output_csv) <- c("objectid", "id_1", "ISO_nation_name", "name_1", "id_2", "name_2", "id_3", "name_3", "region_type_local_2", "region_type_eng_2", "region_name_local_2", "outcome_count", "target_count", "proportion")
+            for(j in 12:14)
+            {
+              for (i in 1:length(output_csv[,j]))
+              {
+                if(is.na(output_csv[i,j]))
+                {
+                  output_csv[i,j] <- c(0)
+                }
+              }
+            }
+            for (i in 1:length(output_csv$prop_count))
+            {
+              output_csv$prop_count[i] <- output_csv$prop_count[i] / fraction
+            }
+            write.csv(output_csv, file)
+          }
         }
+        
         
       }
       )
   })
-
