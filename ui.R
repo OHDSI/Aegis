@@ -30,23 +30,23 @@ packages(shinyjs)
 packages(SqlRender)
 packages(DatabaseConnector)
 packages(shinydashboard)
-
-Sys.setlocale(category = "LC_ALL", locale = "us")
+gpclibPermit()
+#Sys.setlocale(category = "LC_ALL", locale = "us")
 
 shinyApp(
   # Define UI for dataset viewer application
   ui <- dashboardPage(
     dashboardHeader(title = "AEGIS"),
-    dashboardSidebar(sidebarMenu(menuItem("DB Load",tabName= "db" ),
-                                 menuItem("table", tabName = "table" ),
-                                 menuItem("control", tabName = "control" ),
-                                 menuItem("Statistic",tabName = "Statistic" )
-                                )
+    dashboardSidebar(sidebarMenu(menuItem("DB connection",tabName= "db" ),
+                                 menuItem("Cohorts", tabName = "Cohorts" ),
+                                 menuItem("Visualization", tabName = "Visualization" ),
+                                 menuItem("Clustering",tabName = "Clustering" )
+    )
     ),
     dashboardBody(tabItems(
       tabItem(tabName = "db",
               fluidRow(
-                titlePanel("Database Load"),
+                titlePanel("Database connection"),
                 sidebarPanel(
                   textInput("ip","IP","128.1.99.53")
                   ,textInput("schema","SCHEMA","NHIS_NSC_OHDSI_v2_2_0_15ho")
@@ -57,7 +57,7 @@ shinyApp(
                   #,hr()
                   #,uiOutput("db_conn")
                   #,actionButton("cohort_load","Load cohort")
-                  , width=6
+                  ,width=2
                 ),
                 mainPanel(
                   verbatimTextOutput("txt"),
@@ -65,33 +65,38 @@ shinyApp(
                 )
               )
       ),
-      tabItem(tabName = "table",
+      tabItem(tabName = "Cohorts",
               fluidRow(
-                titlePanel("table"),
+                titlePanel("Cohort selection"),
                 sidebarPanel(
                   uiOutput("cohort_tcdi")
+                  ,textInput("description_1","","")
                   ,uiOutput("cohort_ocdi")
+                  ,textInput("description_1","","")
                   ,hr()
                   ,dateRangeInput(inputId = "dateRange", label = "Select Windows",  start = "2002-01-01", end = "2013-12-31")
                   ,hr()
                   ,uiOutput("country_list")
                   ,actionButton("submit_table","submit")
+                  ,width=2
                 ),
                 mainPanel
                 (dataTableOutput('GIS.table'))
               )
       ),
-      tabItem(tabName = "control",
+      tabItem(tabName = "Visualization",
               fluidRow(
-                titlePanel("Plot control"),
+                titlePanel("Visualization setting"),
                 sidebarPanel(
-                  radioButtons("GIS.level","Administrative level",choices = c("Level 1" = 0, "Level 2" = 1, "Level 3" = 2),selected = 1)
+                  radioButtons("GIS.level","Administrative level",choices = c("Level 2" = 1, "Level 3" = 2),selected = 1)
+                  #radioButtons("GIS.level","Administrative level",choices = c("Level 1" = 0, "Level 2" = 1, "Level 3" = 2),selected = 1)
                   ,radioButtons("GIS.distribution","Select distribution options", choices = c("Count of the target cohort (n)" = "count","Propotion" = "proportion", "Standardized Incidence Ratio"="SIR"),selected = "count")
                   #,radioButtons("distinct","Select distinct options", c("Yes" = "distinct","No" = "" ),inline= TRUE)
                   ,textInput("fraction","fraction (only for proportion)",100)
                   ,textInput("plot.title","title"," ")
                   ,textInput("plot.legend","legend"," ")
                   ,actionButton("submit_plot","submit") #Draw plot button
+                  ,width=2
                 ),
                 mainPanel(
                   #verbatimTextOutput("test")
@@ -103,13 +108,14 @@ shinyApp(
       ),
 
 
-      tabItem(tabName ="Statistic",
+      tabItem(tabName ="Clustering",
               fluidRow(
                 titlePanel("Disease clustering"),
                 sidebarPanel(
                   radioButtons("Cluster.method","Cluster Method",choices = c("Local Moran's I" = "moran", "Kulldorff and Nagarwalla's method" = "kulldorff"))
-                  ,textInput("Cluster.parameter","parameter",".15")
+                  ,textInput("Cluster.parameter","Kulldorff's method parameter", ".15")
                   ,actionButton("submit_cluster","submit") #Draw plot button
+                  ,width=2
                 ),
                 mainPanel(
                   dataTableOutput('Cluster.table')
@@ -124,14 +130,14 @@ shinyApp(
 
 
   server <- function(input, output,session)
-    {
+  {
 
     cohort_listup <- eventReactive(input$db_load, {
       connectionDetails <<- DatabaseConnector::createConnectionDetails(dbms="sql server",
-                                                                      server=input$ip,
-                                                                      schema=input$schema,
-                                                                      user=input$usr,
-                                                                      password=input$pw)
+                                                                       server=input$ip,
+                                                                       schema=input$schema,
+                                                                       user=input$usr,
+                                                                       password=input$pw)
       connection <<- DatabaseConnector::connect(connectionDetails)
       cohort_list <- Call.Cohortlist(connectionDetails, connection, input$schema)
     })
@@ -157,19 +163,19 @@ shinyApp(
 
     render.table <- eventReactive(input$submit_table,{
       isolate({
-      country_list <<- GIS.countrylist()
-      country <- input$country
-      MAX.level <<- country_list[country_list$NAME==country,3]
-      GADM <<- GIS.download(country, MAX.level)
-      GADM.table <- GADM[[3]]@data
-      CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$schema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
-                                  input$tcdi, input$ocdi, fraction=1)
-      table <- dplyr::left_join(GADM.table, CDM.table, by=c("ID_2" = "gadm_id"))
-      table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2",
-               "target_count", "outcome_count", "proportion", "SIR", "Expected")]
-        })
-      table
+        country_list <<- GIS.countrylist()
+        country <- input$country
+        MAX.level <<- country_list[country_list$NAME==country,3]
+        GADM <<- GIS.download(country, MAX.level)
+        GADM.table <<- GADM[[3]]@data
+        CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$schema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
+                                            input$tcdi, input$ocdi, fraction=1)
+        table <- dplyr::left_join(GADM.table, CDM.table, by=c("ID_2" = "gadm_id"))
+        table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2",
+                           "target_count", "outcome_count", "proportion", "SIR", "Expected")]
       })
+      table
+    })
 
     output$GIS.table <- renderDataTable(
       render.table()
@@ -188,19 +194,19 @@ shinyApp(
 
     output$GIS.plot <- renderPlot ({
       draw.plot()
-    }, width = 1024, height = 800, res = 100)
+    }, width = 1280, height = 1024, res = 100)
 
-    testing.cluster <- eventReactive(input$submit_cluster,{
-      isolate({
-        CDM.table$Observed <- CDM.table$outcome_count
-        test.summ <- DCluster::achisq.stat(CDM.table, lambda=1)
-      })
-      test.summ[[1]]
-    })
+    #testing.cluster <- eventReactive(input$submit_cluster,{
+    #  isolate({
+    #    CDM.table$Observed <- CDM.table$outcome_count
+    #    test.summ <- DCluster::achisq.stat(CDM.table, lambda=1)
+    #  })
+    #  test.summ[[1]]
+    #})
 
-    output$Cluster.test <- renderText({
-      testing.cluster()
-    })
+    #output$Cluster.test <- renderText({
+    #  testing.cluster()
+    #})
 
     #finding.cluster <- eventReactive(input$submit_cluster,{
     #  isolate({
@@ -215,10 +221,10 @@ shinyApp(
 
     plotting.cluster <- eventReactive(input$submit_cluster,{
       isolate({
-          plot <- Cluster.plot(input$Cluster.method, input$Cluster.parameter)
-        })
-      plot
+        plot <- Cluster.plot(input$Cluster.method, input$Cluster.parameter)
       })
+      plot
+    })
 
 
 
@@ -227,6 +233,6 @@ shinyApp(
     }, width = 1024, height = 800, res = 100)
 
 
-## End of server
-  }
+    ## End of server
+  }, options = list(height = 1000)
 )

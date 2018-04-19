@@ -34,3 +34,4 @@ vignettes/*.pdf
 
 # Etc.
 *.rda
+.Rproj.user
