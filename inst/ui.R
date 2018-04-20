@@ -30,6 +30,7 @@ packages(shinyjs)
 packages(SqlRender)
 packages(DatabaseConnector)
 packages(shinydashboard)
+packages(maptools)
 gpclibPermit()
 #Sys.setlocale(category = "LC_ALL", locale = "us")
 
