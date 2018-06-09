@@ -1,7 +1,7 @@
-Call.DB<-function(server, ip, usr, pw, schema){
+Call.DB<-function(server, ip, usr, pw, Resultschema){
 connectionDetails <- DatabaseConnector::createConnectionDetails(dbms=server,
                                                                server=ip,
-                                                               schema=schema,
+                                                               schema=Resultschema,
                                                                user=usr,
                                                                password=pw)
 connection <<- DatabaseConnector::connect(connectionDetails)

@@ -4,11 +4,11 @@ server <- function(input, output,session)
   cohort_listup <- eventReactive(input$db_load, {
     connectionDetails <<- DatabaseConnector::createConnectionDetails(dbms="sql server",
                                                                      server=input$ip,
-                                                                     schema=input$schema,
+                                                                     schema=input$Resultschema,
                                                                      user=input$usr,
                                                                      password=input$pw)
     connection <<- DatabaseConnector::connect(connectionDetails)
-    cohort_list <- Call.Cohortlist(connectionDetails, connection, input$schema)
+    cohort_list <- Call.Cohortlist(connectionDetails, connection, input$Resultschema)
   })
 
 
@@ -37,11 +37,12 @@ server <- function(input, output,session)
       MAX.level <<- country_list[country_list$NAME==country,3]
       GADM <<- GIS.download(country, MAX.level)
       GADM.table <- GADM[[3]]@data
-      CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$schema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
+      AEGIS::Set.wd(input$CDMschema)
+      CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$CDMschema, input$Resultschema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
                                           input$tcdi, input$ocdi, fraction=1)
       table <- dplyr::left_join(GADM.table, CDM.table, by=c("ID_2" = "gadm_id"))
       table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2",
-                         "target_count", "outcome_count", "proportion", "SIR", "Expected")]
+                         "target_count", "outcome_count", "proportion", "SIR", "Expected", "age_mortality")]
     })
     table
   })

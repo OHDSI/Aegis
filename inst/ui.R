@@ -49,8 +49,9 @@ shinyApp(
               fluidRow(
                 titlePanel("Database connection"),
                 sidebarPanel(
-                  textInput("ip","IP","128.1.99.53")
-                  ,textInput("schema","SCHEMA","NHIS_NSC_OHDSI_v2_2_0_15ho")
+                  textInput("ip","IP","")
+                  ,textInput("CDMschema","CDM Database schema","")
+                  ,textInput("Resultschema","CDM Result schema","")
                   ,textInput("usr","USER","")
                   ,passwordInput("pw","PASSWORD","")
                   #input text to db information
@@ -91,7 +92,7 @@ shinyApp(
                 sidebarPanel(
                   radioButtons("GIS.level","Administrative level",choices = c("Level 2" = 1, "Level 3" = 2),selected = 1)
                   #radioButtons("GIS.level","Administrative level",choices = c("Level 1" = 0, "Level 2" = 1, "Level 3" = 2),selected = 1)
-                  ,radioButtons("GIS.distribution","Select distribution options", choices = c("Count of the target cohort (n)" = "count","Propotion" = "proportion", "Standardized Incidence Ratio"="SIR"),selected = "count")
+                  ,radioButtons("GIS.distribution","Select distribution options", choices = c("Count of the target cohort (n)" = "count","Propotion" = "proportion", "Standardized Incidence Ratio"="SIR", "Age-adjusted incidence"="age_mortality"),selected = "count")
                   #,radioButtons("distinct","Select distinct options", c("Yes" = "distinct","No" = "" ),inline= TRUE)
                   ,textInput("fraction","fraction (only for proportion)",100)
                   ,textInput("plot.title","title"," ")
@@ -136,11 +137,11 @@ shinyApp(
     cohort_listup <- eventReactive(input$db_load, {
       connectionDetails <<- DatabaseConnector::createConnectionDetails(dbms="sql server",
                                                                        server=input$ip,
-                                                                       schema=input$schema,
+                                                                       schema=input$Resultschema,
                                                                        user=input$usr,
                                                                        password=input$pw)
       connection <<- DatabaseConnector::connect(connectionDetails)
-      cohort_list <- Call.Cohortlist(connectionDetails, connection, input$schema)
+      cohort_list <- Call.Cohortlist(connectionDetails, connection, input$Resultschema)
     })
 
 
@@ -169,11 +170,11 @@ shinyApp(
         MAX.level <<- country_list[country_list$NAME==country,3]
         GADM <<- GIS.download(country, MAX.level)
         GADM.table <<- GADM[[3]]@data
-        CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$schema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
+        CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$CDMschema, input$Resultschema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
                                             input$tcdi, input$ocdi, fraction=1)
         table <- dplyr::left_join(GADM.table, CDM.table, by=c("ID_2" = "gadm_id"))
         table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2",
-                           "target_count", "outcome_count", "proportion", "SIR", "Expected")]
+                           "target_count", "outcome_count", "proportion", "SIR", "Expected", "age_mortality")]
       })
       table
     })

@@ -8,7 +8,7 @@
            cohort_start_date,
            cohort_end_date
            FROM
-           @cdmDatabaseSchema.@targettab
+           @resultDatabaseSchema.@targettab
          ) t
        WHERE cohort_definition_id = @tcdi
        AND '@startdt' <= t.cohort_start_date
@@ -25,7 +25,7 @@
            cohort_start_date,
            cohort_end_date
            FROM
-           @cdmDatabaseSchema.@targettab
+           @resultDatabaseSchema.@targettab
          ) o
        WHERE cohort_definition_id = @ocdi
        --AND '@startdt' <= o.cohort_start_date
@@ -43,7 +43,7 @@
        FROM
          (
            SELECT c.fact_id_1 AS gadm_id, count(a.subject_id) AS target_count
-           FROM @cdmDatabaseSchema.@targettab a LEFT JOIN
+           FROM @resultDatabaseSchema.@targettab a LEFT JOIN
            @cdmDatabaseSchema.person b ON a.subject_id = b.person_id LEFT JOIN @cdmDatabaseSchema.fact_relationship c ON b.location_id = c.fact_id_2
            WHERE cohort_definition_id = @tcdi
            AND '@startdt' <= a.cohort_start_date
