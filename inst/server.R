@@ -39,13 +39,14 @@ server <- function(input, output,session)
       GADM.table <- GADM[[3]]@data
       AEGIS::Set.wd(input$CDMschema)
       CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$CDMschema, input$Resultschema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
-                                          input$tcdi, input$ocdi, fraction=1)
+                                          input$tcdi, input$ocdi, input$fraction)
       table <- dplyr::left_join(GADM.table, CDM.table, by=c("ID_2" = "gadm_id"))
-      table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2",
-                         "target_count", "outcome_count", "proportion", "SIR", "Expected", "age_mortality")]
+      table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2", 
+                         "target_count", "outcome_count", "proportion", "SIR", "expected", "indirect_expected", "indirect_incidence", "direct_expected", "direct_incidence")]
     })
     table
   })
+  
 
   output$GIS.table <- renderDataTable(
     render.table()

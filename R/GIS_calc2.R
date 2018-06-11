@@ -4,9 +4,9 @@ GIS.calc2 <- function(GIS.level, fraction){
   fraction <- as.numeric(fraction)
   mapdf <- data.frame()
         for(i in 1:nrow(countdf_level)){
-          countdf_level$prop_count[i] <- (countdf_level$outcome_count[i] / countdf_level$target_count[i])*fraction
-          countdf_level$sir[i] <-(countdf_level$outcome_count[i] / countdf_level$target_count[i]) /
-            (sum(countdf_level$outcome_count) / sum(countdf_level$target_count))
+          #countdf_level$prop_count[i] <- (countdf_level$outcome_count[i] / countdf_level$target_count[i])*fraction
+          #countdf_level$sir[i] <-(countdf_level$outcome_count[i] / countdf_level$target_count[i]) /
+          #  (sum(countdf_level$outcome_count) / sum(countdf_level$target_count))
           idx<-as.numeric(as.character(countdf_level$id[i]))
           polygon <- GADM[[GIS.level]]@polygons[[idx]]
           for(j in 1:length(polygon@Polygons)){

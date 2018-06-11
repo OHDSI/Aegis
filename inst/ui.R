@@ -31,6 +31,8 @@ packages(SqlRender)
 packages(DatabaseConnector)
 packages(shinydashboard)
 packages(maptools)
+packages(SpatialEpi)
+packages(INLA)
 gpclibPermit()
 #Sys.setlocale(category = "LC_ALL", locale = "us")
 
@@ -40,7 +42,7 @@ shinyApp(
     dashboardHeader(title = "AEGIS"),
     dashboardSidebar(sidebarMenu(menuItem("DB connection",tabName= "db" ),
                                  menuItem("Cohorts", tabName = "Cohorts" ),
-                                 menuItem("Visualization", tabName = "Visualization" ),
+                                 menuItem("Disease mapping", tabName = "Disease_mapping" ),
                                  menuItem("Clustering",tabName = "Clustering" )
     )
     ),
@@ -78,6 +80,8 @@ shinyApp(
                   ,hr()
                   ,dateRangeInput(inputId = "dateRange", label = "Select Windows",  start = "2002-01-01", end = "2013-12-31")
                   ,hr()
+                  ,radioButtons("GIS.Age","Age-adjustment",choices = c("No" = "no", "Indirect"="indrect", "Direct" = "direct"))
+                  ,textInput("fraction","fraction",100000)
                   ,uiOutput("country_list")
                   ,actionButton("submit_table","submit")
                   ,width=2
@@ -86,15 +90,14 @@ shinyApp(
                 (dataTableOutput('GIS.table'))
               )
       ),
-      tabItem(tabName = "Visualization",
+      tabItem(tabName = "Disease_mapping",
               fluidRow(
-                titlePanel("Visualization setting"),
+                titlePanel("Disease mapping setting"),
                 sidebarPanel(
                   radioButtons("GIS.level","Administrative level",choices = c("Level 2" = 1, "Level 3" = 2),selected = 1)
                   #radioButtons("GIS.level","Administrative level",choices = c("Level 1" = 0, "Level 2" = 1, "Level 3" = 2),selected = 1)
-                  ,radioButtons("GIS.distribution","Select distribution options", choices = c("Count of the target cohort (n)" = "count","Propotion" = "proportion", "Standardized Incidence Ratio"="SIR", "Age-adjusted incidence"="age_mortality"),selected = "count")
+                  ,radioButtons("GIS.distribution","Select distribution options", choices = c("Count of the target cohort (n)" = "count","Propotion" = "proportion", "Standardized Incidence Ratio"="SIR", "BYM Method"="BYM"),selected = "count")
                   #,radioButtons("distinct","Select distinct options", c("Yes" = "distinct","No" = "" ),inline= TRUE)
-                  ,textInput("fraction","fraction (only for proportion)",100)
                   ,textInput("plot.title","title"," ")
                   ,textInput("plot.legend","legend"," ")
                   ,actionButton("submit_plot","submit") #Draw plot button
@@ -114,7 +117,7 @@ shinyApp(
               fluidRow(
                 titlePanel("Disease clustering"),
                 sidebarPanel(
-                  radioButtons("Cluster.method","Cluster Method",choices = c("Local Moran's I" = "moran", "Kulldorff and Nagarwalla's method" = "kulldorff"))
+                  radioButtons("Cluster.method","Cluster Method",choices = c("Local Moran's I" = "moran", "Kulldorff's method" = "kulldorff"))
                   ,textInput("Cluster.parameter","Kulldorff's method parameter", ".15")
                   ,actionButton("submit_cluster","submit") #Draw plot button
                   ,width=2
@@ -171,10 +174,31 @@ shinyApp(
         GADM <<- GIS.download(country, MAX.level)
         GADM.table <<- GADM[[3]]@data
         CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$CDMschema, input$Resultschema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
-                                            input$tcdi, input$ocdi, fraction=1)
+                                            input$tcdi, input$ocdi, input$fraction)
         table <- dplyr::left_join(GADM.table, CDM.table, by=c("ID_2" = "gadm_id"))
-        table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2",
-                           "target_count", "outcome_count", "proportion", "SIR", "Expected", "age_mortality")]
+        switch(input$GIS.Age,
+               "no"={
+                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2", 
+                                    "target_count", "outcome_count", "proportion", "SIR", "expected"
+                 )]
+                 
+               },
+               "indrect"={
+                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2", 
+                                    "target_count", "outcome_count", 
+                                    "indirect_expected", "indirect_incidence", "indirect_SIR"
+                 )]                  
+                 
+               },
+               "direct"={
+                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2", 
+                                    "target_count", "outcome_count", 
+                                    "direct_expected", "direct_incidence", "direct_SIR"
+                 )]
+                 
+               }
+               
+        )
       })
       table
     })
@@ -187,9 +211,9 @@ shinyApp(
     draw.plot <- eventReactive(input$submit_plot,{
       isolate({
         GADM.table <<- GADM[[3]]@data
-        countdf_level <<- GIS.calc1(input$GIS.level, input$GIS.distribution, input$fraction)
+        countdf_level <<- GIS.calc1(input$GIS.level, input$GIS.distribution, input$GIS.Age)
         mapdf <<- GIS.calc2(input$GIS.level, input$fraction)
-        plot <- GIS.plot(input$GIS.distribution, input$plot.legend, input$plot.title)
+        plot <- GIS.plot(input$GIS.distribution, input$plot.legend, input$plot.title, input$GIS.Age)
       })
       plot
     })
@@ -223,7 +247,7 @@ shinyApp(
 
     plotting.cluster <- eventReactive(input$submit_cluster,{
       isolate({
-        plot <- Cluster.plot(input$Cluster.method, input$Cluster.parameter)
+        plot <- Cluster.plot(input$Cluster.method, input$Cluster.parameter, input$GIS.Age)
       })
       plot
     })

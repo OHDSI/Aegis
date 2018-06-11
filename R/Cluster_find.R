@@ -1,4 +1,4 @@
-Cluster.find<-function(method, parameter){
+Cluster.find<-function(method, parameter, GIS.Age){
   ls <- list()
   for(i in 1:length(GADM[[3]])){
     geo<-GADM[[3]]@polygons[[i]]
@@ -15,7 +15,20 @@ Cluster.find<-function(method, parameter){
   df <- dplyr::left_join(CDM.table, df, by=c("gadm_id" = "a"))
   df <- na.omit(df)
   df$Observed <- df$outcome_count
-  df <- df[, c("gadm_id", "target_count", "Observed", "Expected", "x", "y")]
+  switch(GIS.Age,
+         "no"={
+           df <- df[, c("gadm_id", "target_count", "Observed", "expected", "x", "y")]
+           colnames(df) <- c("gadm_id", "target_count", "Observed", "Expected", "x", "y")
+         },
+         "indrect"={
+           df <- df[, c("gadm_id", "target_count", "Observed", "indirect_expected", "x", "y")]                
+           colnames(df) <- c("gadm_id", "target_count", "Observed", "Expected", "x", "y")
+         },
+         "direct"={
+           df <- df[, c("gadm_id", "target_count", "Observed", "direct_expected", "x", "y")]
+           colnames(df) <- c("gadm_id", "target_count", "Observed", "Expected", "x", "y")
+         }
+  )
 
   parameter <- as.numeric(parameter)
 
@@ -33,6 +46,6 @@ Cluster.find<-function(method, parameter){
   )
   results$gadm_id <- as.numeric(row.names(results))
   results <- dplyr::left_join(results, GADM.table, by=c("gadm_id" = "ID_2"))
-  results <- results[, c("x", "y", "statistic", "cluster", "pvalue", "size", "gadm_id", "NAME_0", "NAME_1", "NAME_2")]
+  results <<- results[, c("x", "y", "statistic", "cluster", "pvalue", "size", "gadm_id", "NAME_0", "NAME_1", "NAME_2")]
   return(results)
 }
