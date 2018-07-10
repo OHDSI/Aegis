@@ -49,7 +49,7 @@ shinyApp(
     dashboardBody(tabItems(
       tabItem(tabName = "db",
               fluidRow(
-                titlePanel("Database connection"),
+                titlePanel("Database Connection"),
                 sidebarPanel(
                   textInput("ip","IP","")
                   ,textInput("CDMschema","CDM Database schema","")

@@ -1,5 +1,3 @@
--- new file for Age-Adjustment 
-
        SELECT t.cohort_definition_id, t.subject_id, t.cohort_start_date, t.cohort_end_date
        INTO #target_cohort
        FROM
@@ -46,9 +44,7 @@
 
        select a.*,b.location_id, 
                      case
-                     when year(a.cohort_start_date)-b.year_of_birth >= 90 then 10
-                     when year(a.cohort_start_date)-b.year_of_birth > 89 then 9
-                     when year(a.cohort_start_date)-b.year_of_birth > 79 then 8
+                     when year(a.cohort_start_date)-b.year_of_birth >= 79 then 8
                      when year(a.cohort_start_date)-b.year_of_birth > 69 then 7
                      when year(a.cohort_start_date)-b.year_of_birth > 59 then 6
                      when year(a.cohort_start_date)-b.year_of_birth > 49 then 5
@@ -57,17 +53,20 @@
                      when year(a.cohort_start_date)-b.year_of_birth > 19 then 2
                      when year(a.cohort_start_date)-b.year_of_birth >= 10 then 1
                      when year(a.cohort_start_date)-b.year_of_birth <= 9 then 0
-                     end as age_cat 
+                     end as age_cat,
+                     case when b.gender_concept_id = '8507' then 0
+                            when b.gender_concept_id = '8532' then 1
+                     end as sex_cat
        into #including_cohort2
        from #including_cohort a join @cdmDatabaseSchema.person b
        on a.subject_id=b.person_id
 
 
-       select distinct a.subject_id, b.fact_id_1, a.age_cat
+       select distinct a.subject_id, b.fact_id_1, a.age_cat, a.sex_cat
        into #including_cohort3
        from #including_cohort2 a left join @cdmDatabaseSchema.fact_relationship b on a.location_id=b.fact_id_2
        where b.domain_concept_id_1 = 4083586
-       order by b.fact_id_1, a.age_cat
+       order by b.fact_id_1, a.age_cat, a.sex_cat
 
        --------- 
        SELECT a.* 
@@ -96,9 +95,7 @@
        a.observation_date=b.observation_date
 
        SELECT a.*, case
-              when year(a.cohort_start_date)-b.year_of_birth >= 90 then 10
-              when year(a.cohort_start_date)-b.year_of_birth > 89 then 9
-              when year(a.cohort_start_date)-b.year_of_birth > 79 then 8
+              when year(a.cohort_start_date)-b.year_of_birth >= 79 then 8
               when year(a.cohort_start_date)-b.year_of_birth > 69 then 7
               when year(a.cohort_start_date)-b.year_of_birth > 59 then 6
               when year(a.cohort_start_date)-b.year_of_birth > 49 then 5
@@ -107,31 +104,34 @@
               when year(a.cohort_start_date)-b.year_of_birth > 19 then 2
               when year(a.cohort_start_date)-b.year_of_birth >= 10 then 1
               when year(a.cohort_start_date)-b.year_of_birth <= 9 then 0
-          end as age_cat
+          end as age_cat,
+                     case when b.gender_concept_id = '8507' then 0
+                            when b.gender_concept_id = '8532' then 1
+                     end as sex_cat
        into #location_temp4
        FROM #location_temp3 a left join @cdmDatabaseSchema.person b
        ON a.subject_id=b.person_id
        ----------
        
-       SELECT a.gadm_id, a.target_count as target_count, b.outcome_count as outcome_count, a.age_cat
+       SELECT a.gadm_id, a.target_count as target_count, b.outcome_count as outcome_count, a.age_cat, a.sex_cat
        FROM
               (
-                     SELECT b.fact_id_1 AS gadm_id, count(a.subject_id) AS target_count, a.age_cat
+                     SELECT b.fact_id_1 AS gadm_id, count(a.subject_id) AS target_count, a.age_cat, a.sex_cat
                      FROM #location_temp4 a LEFT JOIN
                      @cdmDatabaseSchema.fact_relationship b ON a.value_as_number = b.fact_id_2
                      WHERE cohort_definition_id = @tcdi
                      AND '@startdt' <= a.cohort_start_date
                      AND '@enddt' >= a.cohort_start_date
-                     GROUP BY b.fact_id_1, a.age_cat
+                     GROUP BY b.fact_id_1, a.age_cat, a.sex_cat
               ) A
        LEFT JOIN
               (
-                     SELECT fact_id_1 as gadm_id, count(subject_id) AS outcome_count, age_cat
+                     SELECT fact_id_1 as gadm_id, count(subject_id) AS outcome_count, age_cat, sex_cat
                      FROM #including_cohort3
-                     GROUP BY fact_id_1, age_cat
+                     GROUP BY fact_id_1, age_cat, sex_cat
               ) B
-       ON a.gadm_id = b.gadm_id and a.age_cat = b.age_cat
-       GROUP BY a.gadm_id, a.age_cat, a.target_count, b.outcome_count
+       ON a.gadm_id = b.gadm_id and a.age_cat = b.age_cat and a.sex_cat = b.sex_cat
+       GROUP BY a.gadm_id, a.age_cat, a.sex_cat, a.target_count, b.outcome_count
        ORDER BY a.gadm_id, a.age_cat
        
        DROP TABLE #including_cohort
@@ -143,5 +143,3 @@
        DROP TABLE #location_temp2
        DROP TABLE #location_temp3
        DROP TABLE #location_temp4
-
-	   

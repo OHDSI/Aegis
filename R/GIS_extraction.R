@@ -46,24 +46,26 @@ GIS.extraction<-function(connectionDetails, CDMschema, Resultschema, targettab="
   colnames(df) <- tolower(colnames(df))
   colnames(Direct_population) <- tolower(colnames(Direct_population))
   df[, c("outcome_count", "target_count")][is.na(df[, c("outcome_count", "target_count")])] <- 0
+
   
   #Direct age-adjustment
   Direct_population <-data.frame(Direct_population %>%
-                                   group_by(age_cat) %>%
+                                   group_by(age_cat, sex_cat) %>%
                                    summarise(target_sum = sum(count)))
   
   outcome_count <-data.frame(df %>%
-                               group_by(age_cat) %>%
+                               group_by(age_cat, sex_cat) %>%
                                summarise(outcome_sum = sum(outcome_count)))
   
-  Direct_population <- dplyr::left_join(Direct_population, outcome_count, by=c("age_cat"="age_cat"))
+  Direct_population <- dplyr::left_join(Direct_population, outcome_count, by=c("age_cat"="age_cat", "sex_cat"="sex_cat"))
   
   Direct_population$expected <- Direct_population$outcome_sum / Direct_population$target_sum 
+  Direct_population[, c("outcome_sum", "expected")][is.na(Direct_population[, c("outcome_sum", "expected")])] <- 0
   
-  df$mortality <- (df$outcome_count / df$target_count) * 100000
+  df$mortality <- (df$outcome_count / df$target_count) * fraction
   
   standard_population <-data.frame(Direct_population %>%
-                                     group_by(age_cat) %>%
+                                     group_by(age_cat, sex_cat) %>%
                                      summarise(pop = sum(target_sum)))
   
   standard_population$pop_per <- standard_population$pop/fraction
@@ -80,17 +82,16 @@ GIS.extraction<-function(connectionDetails, CDMschema, Resultschema, targettab="
   Direct_calc <- calc
   #
   
-  
   #Indirect age-adjustment
   Indirect_population <-data.frame(df %>%
-                                     group_by(age_cat) %>%
+                                     group_by(age_cat, sex_cat) %>%
                                      summarise(target_sum = sum(target_count),
                                                outcome_sum = sum(outcome_count)))
   
   Indirect_population$expected <- Indirect_population$outcome_sum / Indirect_population$target_sum 
   
   standard_population <-data.frame(df %>%
-                                     group_by(age_cat) %>%
+                                     group_by(age_cat, sex_cat) %>%
                                      summarise(pop = sum(target_count)))
   
   standard_population$pop_per <- standard_population$pop/fraction
