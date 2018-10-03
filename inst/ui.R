@@ -12,7 +12,6 @@ packages<-function(x){
 }
 
 options(expressions=500000)
-setTimeLimit()
 
 packages(DCluster)
 packages(AEGIS)
@@ -32,6 +31,10 @@ packages(DatabaseConnector)
 packages(shinydashboard)
 packages(maptools)
 packages(SpatialEpi)
+packages(lubridate)
+packages(rgdal)
+packages(gpclib)
+packages(rgeos)
 packages(INLA)
 gpclibPermit()
 #Sys.setlocale(category = "LC_ALL", locale = "us")
@@ -52,6 +55,7 @@ shinyApp(
                 titlePanel("Database Connection"),
                 sidebarPanel(
                   textInput("ip","IP","")
+                  ,uiOutput("sqltype")
                   ,textInput("CDMschema","CDM Database schema","")
                   ,textInput("Resultschema","CDM Result schema","")
                   ,textInput("usr","USER","")
@@ -74,13 +78,15 @@ shinyApp(
                 titlePanel("Cohort selection"),
                 sidebarPanel(
                   uiOutput("cohort_tcdi")
-                  ,textInput("description_1","","")
                   ,uiOutput("cohort_ocdi")
-                  ,textInput("description_1","","")
                   ,hr()
                   ,dateRangeInput(inputId = "dateRange", label = "Select Windows",  start = "2002-01-01", end = "2013-12-31")
                   ,hr()
                   ,radioButtons("GIS.Age","Age-adjustment",choices = c("No" = "no", "Indirect"="indrect", "Direct" = "direct"))
+                  ,numericInput("GIS.timeatrisk_startdt","Define the time-at-risk window start, relative to target cohort entry:", 0, min=0)
+                  ,numericInput("GIS.timeatrisk_enddt","Define the time-at-risk window end:", 0, min=0)
+                  ,selectInput("GIS.timeatrisk_enddt_panel","", choices =
+                                c("from cohort start date" = "cohort_start_date","from cohort end date" = "cohort_start_date"),selected = "cohort_end_date")
                   ,textInput("fraction","fraction",100000)
                   ,uiOutput("country_list")
                   ,actionButton("submit_table","submit")
@@ -94,9 +100,9 @@ shinyApp(
               fluidRow(
                 titlePanel("Disease mapping setting"),
                 sidebarPanel(
-                  radioButtons("GIS.level","Administrative level",choices = c("Level 2" = 1, "Level 3" = 2),selected = 1)
+                  radioButtons("GIS.level","Administrative level",choices = c("Level 2" = 1, "Level 3" = 2),selected = 2)
                   #radioButtons("GIS.level","Administrative level",choices = c("Level 1" = 0, "Level 2" = 1, "Level 3" = 2),selected = 1)
-                  ,radioButtons("GIS.distribution","Select distribution options", choices = c("Count of the target cohort (n)" = "count","Propotion" = "proportion", "Standardized Incidence Ratio"="SIR", "BYM Method"="BYM"),selected = "count")
+                  ,radioButtons("GIS.distribution","Select distribution options", choices = c("Count of the target cohort (n)" = "count","Propotion" = "proportion", "Standardized Incidence Ratio"="SIR", "Bayesian mapping"="BYM"),selected = "count")
                   #,radioButtons("distinct","Select distinct options", c("Yes" = "distinct","No" = "" ),inline= TRUE)
                   ,textInput("plot.title","title"," ")
                   ,textInput("plot.legend","legend"," ")
@@ -118,7 +124,7 @@ shinyApp(
                 titlePanel("Disease clustering"),
                 sidebarPanel(
                   radioButtons("Cluster.method","Cluster Method",choices = c("Local Moran's I" = "moran", "Kulldorff's method" = "kulldorff"))
-                  ,textInput("Cluster.parameter","Kulldorff's method parameter", ".15")
+                  ,textInput("Cluster.parameter","Kulldorff's method parameter", "0.1")
                   ,actionButton("submit_cluster","submit") #Draw plot button
                   ,width=2
                 ),
@@ -137,26 +143,29 @@ shinyApp(
   server <- function(input, output,session)
   {
 
-    cohort_listup <- eventReactive(input$db_load, {
-      connectionDetails <<- DatabaseConnector::createConnectionDetails(dbms="sql server",
-                                                                       server=input$ip,
-                                                                       schema=input$Resultschema,
-                                                                       user=input$usr,
-                                                                       password=input$pw)
-      connection <<- DatabaseConnector::connect(connectionDetails)
-      cohort_list <- Call.Cohortlist(connectionDetails, connection, input$Resultschema)
+    output$sqltype <- renderUI({
+      selectInput("sqltype", "Select sql",
+                  choices = c(
+                    "sql server" = "sql server",
+                    "PostgreSQL" = "postresql",
+                    "Amazon Redshift" = "redshift",
+                    "Microsoft Parallel Data Warehouse" = "pdw",
+                    "IBM Netezza" = "netezza",
+                    "Google BigQuery" = "bigquery"
+                              )
+                  )
     })
 
 
     output$cohort_tcdi <- renderUI({
       cohort_list <- cohort_listup()
-      selectInput("tcdi", "Select target cohort", choices = cohort_list[,1])
+      selectInput("tcdi", "Select target cohort", choices = cohort_list[,3])
     })
 
 
     output$cohort_ocdi <- renderUI({
       cohort_list <- cohort_listup()
-      selectInput("ocdi", "Select outcome cohort", choices = cohort_list[,1])
+      selectInput("ocdi", "Select outcome cohort", choices = cohort_list[,3])
     })
 
 
@@ -165,39 +174,53 @@ shinyApp(
       selectInput("country", "Select country", choices = country_list[,1])
     })
 
+    cohort_listup <- eventReactive(input$db_load, {
+      connectionDetails <<- DatabaseConnector::createConnectionDetails(dbms=input$sqltype,
+                                                                       server=input$ip,
+                                                                       schema=input$Resultschema,
+                                                                       user=input$usr,
+                                                                       password=input$pw)
+      connection <<- DatabaseConnector::connect(connectionDetails)
+      cohort_list <<- Call.Cohortlist(connectionDetails, connection, input$Resultschema)
+    })
+
 
     render.table <- eventReactive(input$submit_table,{
       isolate({
         country_list <<- GIS.countrylist()
-        country <- input$country
+        country <<- input$country
         MAX.level <<- country_list[country_list$NAME==country,3]
         GADM <<- GIS.download(country, MAX.level)
         GADM.table <<- GADM[[3]]@data
+        tcdi <- cohort_list[which(cohort_list[,3] %in% input$tcdi == TRUE),1]
+        ocdi <- cohort_list[which(cohort_list[,3] %in% input$ocdi == TRUE),1]
+
         CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$CDMschema, input$Resultschema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
-                                            input$tcdi, input$ocdi, input$fraction)
-        table <- dplyr::left_join(GADM.table, CDM.table, by=c("ID_2" = "gadm_id"))
+                                            tcdi, ocdi, input$fraction, input$GIS.timeatrisk_startdt, input$GIS.timeatrisk_enddt, input$GIS.timeatrisk_enddt_panel)
+        table <- dplyr::left_join(CDM.table, GADM.table, by=c("gadm_id" = "ID_2"))
         switch(input$GIS.Age,
                "no"={
-                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2", 
+                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1",
+                                    "NAME_2",
                                     "target_count", "outcome_count", "proportion", "SIR", "expected"
-                 )]
-                 
+                 )]#"ID_2"
+
                },
                "indrect"={
-                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2", 
-                                    "target_count", "outcome_count", 
+                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1",  "NAME_2",
+                                    "target_count", "outcome_count",
                                     "indirect_expected", "indirect_incidence", "indirect_SIR"
-                 )]                  
-                 
+                 )]#"ID_2",
+
                },
                "direct"={
-                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "ID_2", "NAME_2", 
-                                    "target_count", "outcome_count", 
+                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1",  "NAME_2",
+                                    "target_count", "outcome_count",
                                     "direct_expected", "direct_incidence", "direct_SIR"
-                 )]
-                 
+                 )]#"ID_2",
+
                }
-               
+
         )
       })
       table
@@ -247,7 +270,7 @@ shinyApp(
 
     plotting.cluster <- eventReactive(input$submit_cluster,{
       isolate({
-        plot <- Cluster.plot(input$Cluster.method, input$Cluster.parameter, input$GIS.Age)
+        plot <- Cluster.plot(input$Cluster.method, input$Cluster.parameter, input$GIS.Age, input$country)
       })
       plot
     })

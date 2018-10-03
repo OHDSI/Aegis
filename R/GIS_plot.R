@@ -1,6 +1,6 @@
 GIS.plot <- function(GIS.distribution, input.legend, input.title, GIS.Age){
 
-  map <- GIS.background(GADM[[3]]@bbox)
+  map <- GIS.background(GADM[[3]]@bbox, country)
   switch(GIS.distribution,
          "count"={
            min_value <- min(mapdf$target_count)
@@ -42,7 +42,7 @@ GIS.plot <- function(GIS.distribution, input.legend, input.title, GIS.Age){
 
            a <- poly2nb(GADM[3][[1]])
            nb2INLA("Korea.graph", a)
-           a <- GIS.download("South Korea", "2")
+           a <- GADM
            kr <- a[[3]]
            nrow(CDM.table)
            CDM.table$id2 <- CDM.table$gadm_id
@@ -78,7 +78,7 @@ GIS.plot <- function(GIS.distribution, input.legend, input.title, GIS.Age){
            max_value <- max(kr$RRmean)
 
            mapdf <- mapdf %>%
-             left_join(select(kr, RRmean, id2), by=c("id"="id2"))
+             left_join(dplyr::select(kr, RRmean, id2), by=c("id"="id2"))
 
            plot <- map+
              geom_polygon(data=mapdf,aes(x=long,y=lat,group=group,fill=RRmean),alpha=0.8,colour="black",lwd=0.2)+

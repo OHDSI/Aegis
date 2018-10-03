@@ -12,6 +12,20 @@ Call.Cohortlist<-function(connectionDetails, connection, Resultschema, targettab
                               targettab=targettab)$sql
   sql <- SqlRender::translateSql(sql,
                                  targetDialect=connectionDetails$dbms)$sql
-  Cohortlist<-DatabaseConnector::querySql(connection, sql)
+  cohort<-DatabaseConnector::querySql(connection, sql)
+
+  sql <- "SELECT distinct name, id FROM @resultDatabaseSchema.cohort_definition"
+  sql <- SqlRender::renderSql(sql,
+                              resultDatabaseSchema=resultDatabaseSchema)$sql
+  sql <- SqlRender::translateSql(sql,
+                                 targetDialect=connectionDetails$dbms)$sql
+  cohortname <- DatabaseConnector::querySql(connection, sql)
+
+
+  Cohortlist <- dplyr::left_join(cohort, cohortname, by = c("COHORT_DEFINITION_ID" = "ID"))
+  Cohortlist$cohortname <- paste(Cohortlist$COHORT_DEFINITION_ID, Cohortlist$NAME, sep="; ")
+
+
+
   return(Cohortlist)
 }

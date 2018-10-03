@@ -29,7 +29,7 @@
                      @resultDatabaseSchema.@targettab
               ) o
        WHERE cohort_definition_id = @ocdi
-       --AND '@startdt' <= o.cohort_start_date
+       --AND '@startdt' <= o.cohort_start_date 
        --AND '@enddt' >= o.cohort_end_date
        
        
@@ -40,6 +40,8 @@
        ON t.subject_id = o.subject_id
        WHERE t.cohort_start_date <= o.cohort_start_date
        AND t.cohort_end_date >= o.cohort_start_date
+       --AND dateadd(day, @timeatrisk_startdt, t.cohort_start_date) <= o.cohort_start_date #This code (Time At risk) needs optimization
+       --AND dateadd(day, @timeatrisk_enddt, t.@timeatrisk_enddt_panel) >= o.cohort_end_date
        
 
        select a.*,b.location_id, 
@@ -113,7 +115,7 @@
        ON a.subject_id=b.person_id
        ----------
        
-       SELECT a.gadm_id, a.target_count as target_count, b.outcome_count as outcome_count, a.age_cat, a.sex_cat
+       SELECT cast(a.gadm_id as integer) as gadm_id, cast(a.target_count as integer) as target_count, cast(b.outcome_count as integer) as outcome_count, a.age_cat, a.sex_cat
        FROM
               (
                      SELECT b.fact_id_1 AS gadm_id, count(a.subject_id) AS target_count, a.age_cat, a.sex_cat

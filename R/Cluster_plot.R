@@ -1,30 +1,30 @@
-Cluster.plot <- function(method, parameter, GIS.Age){
+Cluster.plot <- function(method, parameter, GIS.Age, country){
   switch(method,
   "moran" = {
     #get out island district
     moran_poly <- GADM[[3]][-c(125, 134, 145, 153, 158, 161, 162, 189, 190, 193, 195),]
 
-    
+
     switch(GIS.Age,
            "no"={
              df_moran <- CDM.table[, c("SIR", "gadm_id", "outcome_count", "expected")]
              colnames(df_moran) <- c("SIR", "gadm_id", "outcome_count", "expected")
-             
+
            },
            "indrect"={
              df_moran <- CDM.table[, c("indirect_SIR", "gadm_id", "outcome_count", "indirect_expected")]
              colnames(df_moran) <- c("SIR", "gadm_id", "outcome_count", "expected")
-             
+
            },
            "direct"={
              df_moran <- CDM.table[, c("direct_SIR", "gadm_id", "outcome_count", "direct_expected")]
              colnames(df_moran) <- c("SIR", "gadm_id", "outcome_count", "expected")
            }
-           
+
     )
-    
+
     moran_poly@data <- moran_poly@data %>%
-    left_join(select(df_moran, SIR, gadm_id, outcome_count, expected), by=c("ID_2"="gadm_id"))
+    left_join(dplyr::select(df_moran, SIR, gadm_id, outcome_count, expected), by=c("ID_2"="gadm_id"))
 
     spatmatrix <- poly2nb(moran_poly)
 
@@ -80,22 +80,23 @@ Cluster.plot <- function(method, parameter, GIS.Age){
     ## ###############################
     #moran <- moranI.test(outcome_count~offset(expected), moran_poly@data, model="poisson", R=99,
     #            listw=listw, n=length(spatmatrix), S0=Szero(listw))
-    
+
     #str(moran)
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
     #global_moran <- paste0("Global Moran'I Statistic and p-value :", round(result$most.likely.cluster$p.value,digits = 4))
-    
-    
-    map <- GIS.background(GADM[[3]]@bbox)
+
+
+    map <- GIS.background(GADM[[3]]@bbox, country)
     plot <- map +
       geom_polygon(data=df,aes(x=long,y=lat,group=group,fill=quad_sig),colour="black", size=.05)+
       coord_equal() +
-      theme_void() + scale_fill_brewer( palette = "Set1")
+      theme_void() + scale_fill_brewer( palette = "Set1") +
+      coord_fixed(ratio=1.1)
 
   },
   "kulldorff" = {
@@ -113,10 +114,10 @@ Cluster.plot <- function(method, parameter, GIS.Age){
 
 
     df <- do.call(rbind, ls)
-    
+
     geo<- latlong2grid(df)
-    
-    pop.upper.bound <- 0.15
+
+    pop.upper.bound <- parameter
     n.simulations <- 999
     alpha.level <- 0.05
     n.strata <- 16
@@ -124,13 +125,13 @@ Cluster.plot <- function(method, parameter, GIS.Age){
 
     df <- dplyr::left_join(CDM.table, df, by=c("gadm_id" = "a"))
     df <- na.omit(df)
-    
-    
+
+
     population <- tapply(df$target_count,df$gadm_id,sum)
     cases <- tapply(df$outcome_count,df$gadm_id,sum)
-    
 
-    
+
+
     switch(GIS.Age,
            "no"={
              df <- df[, c("gadm_id", "target_count", "outcome_count", "expected", "x", "y")]
@@ -138,7 +139,7 @@ Cluster.plot <- function(method, parameter, GIS.Age){
              expected.cases <- df$Expected
            },
            "indrect"={
-             df <- df[, c("gadm_id", "target_count", "outcome_count", "indirect_expected", "x", "y")]                
+             df <- df[, c("gadm_id", "target_count", "outcome_count", "indirect_expected", "x", "y")]
              colnames(df) <- c("gadm_id", "target_count", "Observed", "Expected", "x", "y")
              expected.cases <- df$Expected
            },
@@ -148,17 +149,17 @@ Cluster.plot <- function(method, parameter, GIS.Age){
              expected.cases <- df$Expected
            }
     )
-    
-    result <<- kulldorff(geo, cases, population, expected.cases, pop.upper.bound, 
+
+    result <<- kulldorff(geo, cases, population, expected.cases, pop.upper.bound,
                          n.simulations, alpha.level, plot)
 
     df_2 <- GADM.table
     df_2$cluster <- ifelse(
-                    GADM.table$ID_2 %in% result$most.likely.cluster$location.IDs.included, "Primary cluster", 
+                    GADM.table$ID_2 %in% result$most.likely.cluster$location.IDs.included, "Primary cluster",
                     ifelse(GADM.table$ID_2 %in% result$secondary.clusters[[1]]$location.IDs.included, "Secondary cluster", "Non-clustered"))
-    
+
     df_2$cluster <- factor(df_2$cluster, levels = c("Non-clustered", "Secondary cluster", "Primary cluster"))
-    
+
     gadm <- GADM[[3]]
 
     mapdf<-data.frame()
@@ -179,19 +180,19 @@ Cluster.plot <- function(method, parameter, GIS.Age){
     }
 
     df_2 <- dplyr::left_join(mapdf, df_2, by=c("id"="ID_2"))
-    
-    map <- AEGIS::GIS.background(GADM[[3]]@bbox)
-  
+
+    map <- AEGIS::GIS.background(GADM[[3]]@bbox, country)
+
     primary_labs <- paste0("Primary cluster p-value :", round(result$most.likely.cluster$p.value,digits = 4))
-    
-    ifelse(is.null(result$secondary.clusters[[1]]$p.value), 
+
+    ifelse(is.null(result$secondary.clusters[[1]]$p.value),
            secondary_labs <- paste0("Secondary cluster p-value : None"),
            secondary_labs <- paste0("Secondary cluster p-value :", round(result$secondary.clusters[[1]]$p.value, digits = 4))
            )
-    
+
     plot <- map +
       geom_polygon(data=df_2,aes(x=long,y=lat,group=group,fill=cluster),alpha=0.3,colour="black",lwd=0.2)+
-      scale_fill_manual(values = c("white", "green", "red")) +  
+      scale_fill_manual(values = c("white", "green", "red")) +
       labs(title = primary_labs, subtitle =  secondary_labs)
   }
   )
