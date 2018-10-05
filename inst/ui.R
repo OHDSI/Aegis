@@ -159,13 +159,22 @@ shinyApp(
 
     output$cohort_tcdi <- renderUI({
       cohort_list <- cohort_listup()
-      selectInput("tcdi", "Select target cohort", choices = cohort_list[,3])
+      if (length(cohort_list)>1) {
+        selectInput("tcdi", "Select target cohort", choices = cohort_list[,3])  
+      } else {
+        selectInput("tcdi", "Select target cohort", choices = cohort_list[,1])
+      }
     })
 
 
     output$cohort_ocdi <- renderUI({
       cohort_list <- cohort_listup()
-      selectInput("ocdi", "Select outcome cohort", choices = cohort_list[,3])
+      #selectInput("ocdi", "Select outcome cohort", choices = cohort_list[,3])
+      if (length(cohort_list)>1) {
+          selectInput("ocdi", "Select target cohort", choices = cohort_list[,3])  
+        } else {
+          selectInput("ocdi", "Select target cohort", choices = cohort_list[,1])
+        }
     })
 
 
@@ -192,8 +201,15 @@ shinyApp(
         MAX.level <<- country_list[country_list$NAME==country,3]
         GADM <<- GIS.download(country, MAX.level)
         GADM.table <<- GADM[[3]]@data
-        tcdi <- cohort_list[which(cohort_list[,3] %in% input$tcdi == TRUE),1]
-        ocdi <- cohort_list[which(cohort_list[,3] %in% input$ocdi == TRUE),1]
+        
+        #Conditional input cohort number
+        if (length(cohort_list)>1) {
+          tcdi <- cohort_list[which(cohort_list[,3] %in% input$tcdi == TRUE),1]
+          ocdi <- cohort_list[which(cohort_list[,3] %in% input$ocdi == TRUE),1]
+        } else {
+          tcdi <- input$tcdi
+          ocdi <- input$ocdi
+        }
 
         CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$CDMschema, input$Resultschema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
                                             tcdi, ocdi, input$fraction, input$GIS.timeatrisk_startdt, input$GIS.timeatrisk_enddt, input$GIS.timeatrisk_enddt_panel)
