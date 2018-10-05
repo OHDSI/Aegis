@@ -144,7 +144,7 @@ shinyApp(
   {
 
     output$sqltype <- renderUI({
-      selectInput("sqltype", "Select sql",
+      selectInput("sqltype", "Select DBMS",
                   choices = c(
                     "sql server" = "sql server",
                     "PostgreSQL" = "postresql",
@@ -160,7 +160,7 @@ shinyApp(
     output$cohort_tcdi <- renderUI({
       cohort_list <- cohort_listup()
       if (length(cohort_list)>1) {
-        selectInput("tcdi", "Select target cohort", choices = cohort_list[,3])  
+        selectInput("tcdi", "Select target cohort", choices = cohort_list[,3])
       } else {
         selectInput("tcdi", "Select target cohort", choices = cohort_list[,1])
       }
@@ -171,7 +171,7 @@ shinyApp(
       cohort_list <- cohort_listup()
       #selectInput("ocdi", "Select outcome cohort", choices = cohort_list[,3])
       if (length(cohort_list)>1) {
-          selectInput("ocdi", "Select target cohort", choices = cohort_list[,3])  
+          selectInput("ocdi", "Select target cohort", choices = cohort_list[,3])
         } else {
           selectInput("ocdi", "Select target cohort", choices = cohort_list[,1])
         }
@@ -201,7 +201,7 @@ shinyApp(
         MAX.level <<- country_list[country_list$NAME==country,3]
         GADM <<- GIS.download(country, MAX.level)
         GADM.table <<- GADM[[3]]@data
-        
+
         #Conditional input cohort number
         if (length(cohort_list)>1) {
           tcdi <- cohort_list[which(cohort_list[,3] %in% input$tcdi == TRUE),1]
