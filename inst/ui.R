@@ -35,7 +35,7 @@ packages(lubridate)
 packages(rgdal)
 packages(gpclib)
 packages(rgeos)
-packages(INLA)
+library(INLA)
 gpclibPermit()
 #Sys.setlocale(category = "LC_ALL", locale = "us")
 

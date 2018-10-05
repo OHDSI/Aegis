@@ -1,6 +1,6 @@
 Package: AEGIS
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Application for Epidemiological Geographic Information System (AEGIS): An open source spatial analysis tool based on CDM
 Version: 0.1.0
 Author: Jaehyeong Cho, Seng Chan You
 Maintainer: Jaehyeong Cho <boyinai03@gmail.com>
@@ -10,4 +10,5 @@ Encoding: UTF-8
 RoxygenNote: 6.0.1
 LazyData: true
 Imports:
-  dplyr
+  dplyr,
+  shiny
