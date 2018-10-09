@@ -49,10 +49,14 @@ GIS.extraction<-function(connectionDetails, CDMschema, Resultschema, targettab="
   df <- DatabaseConnector::querySql(connection, sql)
   Direct_population <- AEGIS::GIS.DirectAgeAdjustment(cdmDatabaseSchema, startdt)
 
+
+
   colnames(df) <- tolower(colnames(df))
   colnames(Direct_population) <- tolower(colnames(Direct_population))
   df[, c("outcome_count", "target_count")][is.na(df[, c("outcome_count", "target_count")])] <- 0
   df$incidence <- (df$outcome_count / df$target_count) * fraction
+
+
 
   #Direct age-adjustment
 

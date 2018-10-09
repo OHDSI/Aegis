@@ -27,5 +27,3 @@ GIS.background<-function(bbox, country){
         )
   return(map)
 }
-
-

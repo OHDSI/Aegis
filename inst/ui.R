@@ -35,7 +35,13 @@ packages(lubridate)
 packages(rgdal)
 packages(gpclib)
 packages(rgeos)
-library(INLA)
+
+#INLA package is very heavy
+#So, INLA packages must be downloaded separately
+if(isTRUE(which(installed.packages()[,1] %in% "INLA")>1)){
+  library(INLA)
+}
+
 gpclibPermit()
 #Sys.setlocale(category = "LC_ALL", locale = "us")
 

@@ -101,17 +101,21 @@ Cluster.plot <- function(method, parameter, GIS.Age, country){
   },
   "kulldorff" = {
     parameter <- as.numeric(parameter)
+    
+    gadm_id <- CDM.table[,"gadm_id"]
+    
     ls <- list()
-    for(i in 1:length(GADM[[3]])){
-      geo<-GADM[[3]]@polygons[[i]]
-      a<-i
+    for(i in 1:length(gadm_id)) {
+      idx <- gadm_id[i]
+      geo<-GADM[[3]]@polygons[[idx]]
+      a<-idx
       y<-geo@labpt[1]
       x<-geo@labpt[2]
       theta <- cbind(a,x,y)
       theta <- data.frame(theta)
       ls[[i]] <- theta
     }
-
+    
 
     df <- do.call(rbind, ls)
 
@@ -124,7 +128,7 @@ Cluster.plot <- function(method, parameter, GIS.Age, country){
     plot <- TRUE
 
     df <- dplyr::left_join(CDM.table, df, by=c("gadm_id" = "a"))
-    df <- na.omit(df)
+    #df <- na.omit(df)
 
 
     population <- tapply(df$target_count,df$gadm_id,sum)
@@ -163,9 +167,9 @@ Cluster.plot <- function(method, parameter, GIS.Age, country){
     gadm <- GADM[[3]]
 
     mapdf<-data.frame()
-    for(i in 1:length(gadm))
+    for(i in 1:length(gadm_id))
     {
-      idx<-as.numeric(as.character(gadm$ID_2[i]))
+      idx<-as.numeric(as.character(gadm_id[i]))
       polygon <- gadm@polygons[[idx]]
       for(j in 1:length(polygon@Polygons))
       {
