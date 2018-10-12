@@ -66,12 +66,12 @@
                             when b.gender_concept_id = '8532' then 1
                      end as sex_cat
        into #including_cohort2
-       from #including_cohort a join synthea_cdm_yh.dbo.person b
+       from #including_cohort a join @resultDatabaseSchema.person b
        on a.subject_id=b.person_id
 
      select distinct a.subject_id, b.fact_id_2, a.age_cat, a.sex_cat
        into #including_cohort3
-       from #including_cohort2 a join synthea_cdm_yh.dbo.fact_relationship b on a.location_id=b.fact_id_1
+       from #including_cohort2 a join @resultDatabaseSchema.fact_relationship b on a.location_id=b.fact_id_1
        where b.domain_concept_id_1 = 4083586
        order by b.fact_id_2, a.age_cat, a.sex_cat
        ---- end of setting for including cohort
@@ -85,7 +85,7 @@
        ---- person cohort
        SELECT a.* 
        into #person_temp
-       FROM synthea_cdm_yh.dbo.cohort a 
+       FROM @resultDatabaseSchema.cohort a 
        WHERE COHORT_DEFINITION_ID = 1
 
 
@@ -106,7 +106,7 @@
               when b.gender_concept_id = '8532' then 1
           end as sex_cat
        into #person_temp2
-       from #person_temp a left join synthea_cdm_yh.dbo.person b
+       from #person_temp a left join @resultDatabaseSchema.person b
        on a.subject_id=b.person_id
        ---- end of setting for person_cohort
 
