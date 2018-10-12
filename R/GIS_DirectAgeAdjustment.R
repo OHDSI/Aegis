@@ -27,7 +27,7 @@ order by age_cat desc
 
 
 select count(a.person_id) as count, b.fact_id_1 as gadm_id, a.age_cat, a.sex_cat
-from #temp a left join @cdmDatabaseSchema.dbo.fact_relationship b on a.location_id=b.fact_id_2
+from #temp a left join @cdmDatabaseSchema.fact_relationship b on a.location_id=b.fact_id_2
 where b.domain_concept_id_1 = 4083586
 group by b.fact_id_1, a.age_cat, a.sex_cat
 order by b.fact_id_1, a.age_cat, a.sex_cat
