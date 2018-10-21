@@ -40,8 +40,8 @@
        ON t.subject_id = o.subject_id
        WHERE t.cohort_start_date <= o.cohort_start_date
        AND t.cohort_end_date >= o.cohort_start_date
-       --AND dateadd(day, @timeatrisk_startdt, t.cohort_start_date) <= o.cohort_start_date #This code (Time At risk) needs optimization
-       --AND dateadd(day, @timeatrisk_enddt, t.@timeatrisk_enddt_panel) >= o.cohort_end_date
+       AND dateadd(day, @timeatrisk_startdt, t.cohort_start_date) <= o.cohort_start_date 
+       AND dateadd(day, @timeatrisk_enddt, t.@timeatrisk_enddt_panel) >= o.cohort_end_date
        
 
        select a.*,b.location_id, 

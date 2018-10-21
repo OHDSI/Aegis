@@ -7,18 +7,14 @@ Cluster.plot <- function(method, parameter, GIS.Age, country){
 
     switch(GIS.Age,
            "no"={
-             df_moran <- CDM.table[, c("SIR", "gadm_id", "outcome_count", "expected")]
+             df_moran <- CDM.table[, c("crd_sir", "gadm_id", "outcome_count", "crd_expected")]
              colnames(df_moran) <- c("SIR", "gadm_id", "outcome_count", "expected")
 
            },
-           "indrect"={
-             df_moran <- CDM.table[, c("indirect_SIR", "gadm_id", "outcome_count", "indirect_expected")]
+           "yes"={
+             df_moran <- CDM.table[, c("std_sir", "gadm_id", "outcome_count", "std_expected")]
              colnames(df_moran) <- c("SIR", "gadm_id", "outcome_count", "expected")
 
-           },
-           "direct"={
-             df_moran <- CDM.table[, c("direct_SIR", "gadm_id", "outcome_count", "direct_expected")]
-             colnames(df_moran) <- c("SIR", "gadm_id", "outcome_count", "expected")
            }
 
     )
@@ -101,9 +97,9 @@ Cluster.plot <- function(method, parameter, GIS.Age, country){
   },
   "kulldorff" = {
     parameter <- as.numeric(parameter)
-    
+
     gadm_id <- CDM.table[,"gadm_id"]
-    
+
     ls <- list()
     for(i in 1:length(gadm_id)) {
       idx <- gadm_id[i]
@@ -115,7 +111,7 @@ Cluster.plot <- function(method, parameter, GIS.Age, country){
       theta <- data.frame(theta)
       ls[[i]] <- theta
     }
-    
+
 
     df <- do.call(rbind, ls)
 
@@ -138,17 +134,12 @@ Cluster.plot <- function(method, parameter, GIS.Age, country){
 
     switch(GIS.Age,
            "no"={
-             df <- df[, c("gadm_id", "target_count", "outcome_count", "expected", "x", "y")]
+             df <- df[, c("gadm_id", "target_count", "outcome_count", "crd_expected", "x", "y")]
              colnames(df) <- c("gadm_id", "target_count", "Observed", "Expected", "x", "y")
              expected.cases <- df$Expected
            },
-           "indrect"={
-             df <- df[, c("gadm_id", "target_count", "outcome_count", "indirect_expected", "x", "y")]
-             colnames(df) <- c("gadm_id", "target_count", "Observed", "Expected", "x", "y")
-             expected.cases <- df$Expected
-           },
-           "direct"={
-             df <- df[, c("gadm_id", "target_count", "outcome_count", "direct_expected", "x", "y")]
+           "yes"={
+             df <- df[, c("gadm_id", "target_count", "outcome_count", "std_expected", "x", "y")]
              colnames(df) <- c("gadm_id", "target_count", "Observed", "Expected", "x", "y")
              expected.cases <- df$Expected
            }
