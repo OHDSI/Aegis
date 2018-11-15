@@ -124,6 +124,15 @@ shinyApp(
               )
       ),
 
+      tabItem(tabName = "Leaflet(beta)",
+              fluidRow(
+                titlePanel("Interactive disease map(beta)"),
+                mainPanel(
+                  leafletOutput("mappingLeaflet")
+                )
+              )
+      ),
+
 
       tabItem(tabName ="Clustering",
               fluidRow(
@@ -257,6 +266,15 @@ shinyApp(
     output$GIS.plot <- renderPlot ({
       draw.plot()
     }, width = 1280, height = 1024, res = 100)
+
+
+
+    # 현재 여기 설정중~!@~!@~!@~!@
+    # draw.leaflet <-
+    #
+    # output$mappingLeaflet <- renderLeaflet({
+    #   AEGIS::leafletMapping()
+    # })
 
     #testing.cluster <- eventReactive(input$submit_cluster,{
     #  isolate({
