@@ -19,6 +19,7 @@ packages(raster)
 packages(maps)
 packages(mapdata)
 packages(mapproj)
+packages(leaflet)
 packages(ggmap)
 packages(dplyr)
 packages(sqldf)
@@ -52,7 +53,8 @@ shinyApp(
     dashboardSidebar(sidebarMenu(menuItem("DB connection",tabName= "db" ),
                                  menuItem("Cohorts", tabName = "Cohorts" ),
                                  menuItem("Disease mapping", tabName = "Disease_mapping" ),
-                                 menuItem("Clustering",tabName = "Clustering" )
+                                 menuItem("Clustering",tabName = "Clustering" ),
+                                 menuItem("Interactive disease map(beta)", tabName = "Leaflet(beta)" )
     )
     ),
     dashboardBody(tabItems(
@@ -120,6 +122,15 @@ shinyApp(
                   #,
                   plotOutput("GIS.plot")
                   #,textOutput("text")
+                )
+              )
+      ),
+
+      tabItem(tabName = "Leaflet(beta)",
+              fluidRow(
+                titlePanel("Interactive disease map(beta)"),
+                mainPanel(
+                  leafletOutput("mappingLeaflet")
                 )
               )
       ),
@@ -254,9 +265,15 @@ shinyApp(
       plot
     })
 
+
     output$GIS.plot <- renderPlot ({
       draw.plot()
     }, width = 1280, height = 1024, res = 100)
+
+
+     output$mappingLeaflet <- renderLeaflet({
+      leafletMapping()
+     })
 
     #testing.cluster <- eventReactive(input$submit_cluster,{
     #  isolate({
@@ -298,3 +315,4 @@ shinyApp(
     ## End of server
   }, options = list(height = 1000)
 )
+

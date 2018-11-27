@@ -115,7 +115,7 @@ Cluster.plot <- function(method, parameter, GIS.Age, country){
 
     df <- do.call(rbind, ls)
 
-    geo<- latlong2grid(df)
+    geo<- latlong2grid(df[, c(2,3)])
 
     pop.upper.bound <- parameter
     n.simulations <- 999
@@ -187,7 +187,7 @@ Cluster.plot <- function(method, parameter, GIS.Age, country){
 
     plot <- map +
       geom_polygon(data=df_2,aes(x=long,y=lat,group=group,fill=cluster),alpha=0.3,colour="black",lwd=0.2)+
-      scale_fill_manual(values = c("white", "green", "red")) +
+      scale_fill_manual(values = c("Non-clustered"="white", "Secondary cluster"="green", "Primary cluster"="red")) +
       labs(title = primary_labs, subtitle =  secondary_labs)
   }
   )
