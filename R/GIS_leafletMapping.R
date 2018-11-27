@@ -1,6 +1,6 @@
 leafletMapping <-  function(){
 
-      if(exists("GADM[[1]]")){
+      if(!exists("GADM[[1]]")){
         m <- leaflet() %>%
           addTiles %>%
           fitBounds (

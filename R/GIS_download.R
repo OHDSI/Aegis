@@ -13,7 +13,11 @@ GIS.download <- function(country, MAX.level){
   }
   else
   {
-    load(paste0("GADM_2.8_",country,"_adm_total.rda"))
+    load(GADM.file)
     return(GADM_list)
   }
 }
+
+GIS.download("South Korea", 2)
+
+

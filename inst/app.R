@@ -19,6 +19,7 @@ packages(raster)
 packages(maps)
 packages(mapdata)
 packages(mapproj)
+packages(leaflet)
 packages(ggmap)
 packages(dplyr)
 packages(sqldf)
@@ -52,7 +53,8 @@ shinyApp(
     dashboardSidebar(sidebarMenu(menuItem("DB connection",tabName= "db" ),
                                  menuItem("Cohorts", tabName = "Cohorts" ),
                                  menuItem("Disease mapping", tabName = "Disease_mapping" ),
-                                 menuItem("Clustering",tabName = "Clustering" )
+                                 menuItem("Clustering",tabName = "Clustering" ),
+                                 menuItem("Interactive disease map(beta)", tabName = "Leaflet(beta)" )
     )
     ),
     dashboardBody(tabItems(
@@ -263,18 +265,15 @@ shinyApp(
       plot
     })
 
+
     output$GIS.plot <- renderPlot ({
       draw.plot()
     }, width = 1280, height = 1024, res = 100)
 
 
-
-    # 현재 여기 설정중~!@~!@~!@~!@
-    # draw.leaflet <-
-    #
-    # output$mappingLeaflet <- renderLeaflet({
-    #   AEGIS::leafletMapping()
-    # })
+     output$mappingLeaflet <- renderLeaflet({
+      leafletMapping()
+     })
 
     #testing.cluster <- eventReactive(input$submit_cluster,{
     #  isolate({
@@ -316,3 +315,4 @@ shinyApp(
     ## End of server
   }, options = list(height = 1000)
 )
+
