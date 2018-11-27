@@ -8,7 +8,7 @@ GIS.download <- function(country, MAX.level){
       GADM_list[[j]] <- x
     }
     save(GADM_list, file=paste0("GADM_2.8_",country,"_adm_total.rda"))
-    load(paste0("GADM_2.8_",country,"_adm_total.rda"))
+    load(GADM.file)
     return(GADM_list)
   }
   else
@@ -17,7 +17,3 @@ GIS.download <- function(country, MAX.level){
     return(GADM_list)
   }
 }
-
-GIS.download("South Korea", 2)
-
-
