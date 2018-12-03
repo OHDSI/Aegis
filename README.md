@@ -8,6 +8,8 @@ devtools::install_github("cran/raster", ref="2.6-7)
 devtools::install_github("ohdsi/DatabaseConnector")
 devtools::install_github("ohdsi/SqlRender")
 devtools::install_github("ohdsi/aegis")
+
+AEGIS::AEGIS()
 ```
 If you need to use Bayesian mapping (small area estimation), you need to install R-INLA as follows:
 ```r
