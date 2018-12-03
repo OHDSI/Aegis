@@ -4,6 +4,7 @@ Application for Epidemiological Geographic Information System (AEGIS): An open s
 # Getting Started
 ```r
 install.packages("devtools")
+devtools::install_github("cran/raster", ref="2.6-7)
 devtools::install_github("ohdsi/DatabaseConnector")
 devtools::install_github("ohdsi/SqlRender")
 devtools::install_github("ohdsi/aegis")
