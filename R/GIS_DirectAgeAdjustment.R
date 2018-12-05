@@ -1,3 +1,4 @@
+#This function is not used in this version
 GIS.DirectAgeAdjustment <- function(CDMschema, year){
 
 targettab <- "person"

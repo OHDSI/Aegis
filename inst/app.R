@@ -19,6 +19,7 @@ packages(raster)
 packages(maps)
 packages(mapdata)
 packages(mapproj)
+packages(leaflet)
 packages(ggmap)
 packages(dplyr)
 packages(sqldf)
@@ -43,7 +44,7 @@ if(isTRUE(which(installed.packages()[,1] %in% "INLA")>1)){
 }
 
 gpclibPermit()
-#Sys.setlocale(category = "LC_ALL", locale = "us")
+Sys.setlocale(category = "LC_ALL", locale = "us")
 
 shinyApp(
   # Define UI for dataset viewer application
@@ -52,7 +53,8 @@ shinyApp(
     dashboardSidebar(sidebarMenu(menuItem("DB connection",tabName= "db" ),
                                  menuItem("Cohorts", tabName = "Cohorts" ),
                                  menuItem("Disease mapping", tabName = "Disease_mapping" ),
-                                 menuItem("Clustering",tabName = "Clustering" )
+                                 menuItem("Clustering",tabName = "Clustering" ),
+                                 menuItem("Interactive disease map(beta)", tabName = "Leaflet(beta)" )
     )
     ),
     dashboardBody(tabItems(
@@ -88,7 +90,7 @@ shinyApp(
                   ,hr()
                   ,dateRangeInput(inputId = "dateRange", label = "Select Windows",  start = "2002-01-01", end = "2013-12-31")
                   ,hr()
-                  ,radioButtons("GIS.Age","Age-adjustment",choices = c("No" = "no", "Indirect"="indrect", "Direct" = "direct"))
+                  ,radioButtons("GIS.Age","Age and gender adjust",choices = c("No" = "no", "Yes"="yes"))
                   ,numericInput("GIS.timeatrisk_startdt","Define the time-at-risk window start, relative to target cohort entry:", 0, min=0)
                   ,numericInput("GIS.timeatrisk_enddt","Define the time-at-risk window end:", 0, min=0)
                   ,selectInput("GIS.timeatrisk_enddt_panel","", choices =
@@ -120,6 +122,15 @@ shinyApp(
                   #,
                   plotOutput("GIS.plot")
                   #,textOutput("text")
+                )
+              )
+      ),
+
+      tabItem(tabName = "Leaflet(beta)",
+              fluidRow(
+                titlePanel("Interactive disease map(beta)"),
+                mainPanel(
+                  leafletOutput("mappingLeaflet")
                 )
               )
       ),
@@ -222,23 +233,14 @@ shinyApp(
         table <- dplyr::left_join(CDM.table, GADM.table, by=c("gadm_id" = "ID_2"))
         switch(input$GIS.Age,
                "no"={
-                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1",
-                                    "NAME_2",
-                                    "target_count", "outcome_count", "proportion", "SIR", "expected"
+                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "NAME_2",
+                                    "target_count", "outcome_count", "crd_expected", "crd_prop", "crd_sir"
                  )]#"ID_2"
 
                },
-               "indrect"={
+               "yes"={
                  table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1",  "NAME_2",
-                                    "target_count", "outcome_count",
-                                    "indirect_expected", "indirect_incidence", "indirect_SIR"
-                 )]#"ID_2",
-
-               },
-               "direct"={
-                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1",  "NAME_2",
-                                    "target_count", "outcome_count",
-                                    "direct_expected", "direct_incidence", "direct_SIR"
+                                    "target_count", "outcome_count", "std_expected", "std_prop", "std_sir"
                  )]#"ID_2",
 
                }
@@ -263,9 +265,15 @@ shinyApp(
       plot
     })
 
+
     output$GIS.plot <- renderPlot ({
       draw.plot()
     }, width = 1280, height = 1024, res = 100)
+
+
+     output$mappingLeaflet <- renderLeaflet({
+      leafletMapping()
+     })
 
     #testing.cluster <- eventReactive(input$submit_cluster,{
     #  isolate({
@@ -307,3 +315,4 @@ shinyApp(
     ## End of server
   }, options = list(height = 1000)
 )
+
