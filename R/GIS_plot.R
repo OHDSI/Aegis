@@ -41,7 +41,7 @@ GIS.plot <- function(GIS.distribution, input.legend, input.title, GIS.Age){
          "BYM"={
 
            a <- poly2nb(GADM[3][[1]])
-           nb2INLA("Korea.graph", a)
+           nb2INLA("BayesianMap.graph", a)
            a <- GADM
            kr <- a[[3]]
            nrow(CDM.table)
@@ -52,13 +52,13 @@ GIS.plot <- function(GIS.distribution, input.legend, input.title, GIS.Age){
            switch(GIS.Age,
                   "no"={
                     m1 <- inla(outcome_count ~ 1 + f(ID_2, model = "iid") +
-                                 f(id2, model = "bym2", graph = "Korea.graph", adjust.for.con.comp=TRUE), family = "poisson",
+                                 f(id2, model = "bym2", graph = "BayesianMap.graph", adjust.for.con.comp=TRUE), family = "poisson",
                                data = as.data.frame(kr), E=crd_expected,
                                control.predictor = list(compute = TRUE))
                   },
                   "yes"={
                     m1 <- inla(outcome_count ~ 1 + f(ID_2, model = "iid") +
-                                 f(id2, model = "bym2", graph = "Korea.graph", adjust.for.con.comp=TRUE), family = "poisson",
+                                 f(id2, model = "bym2", graph = "BayesianMap.graph", adjust.for.con.comp=TRUE), family = "poisson",
                                data = as.data.frame(kr), E=std_expected,
                                control.predictor = list(compute = TRUE))
                   }
