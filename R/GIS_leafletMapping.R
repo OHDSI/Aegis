@@ -1,4 +1,4 @@
-leafletMapping <-  function(){
+leafletMapping <-  function(GIS.level){
 
       if(!exists("GADM[[1]]")){
         m <- leaflet() %>%
@@ -6,14 +6,10 @@ leafletMapping <-  function(){
           fitBounds (
             lng1="-179.1506", lng2="179.7734",
             lat1="18.90986", lat2="72.6875")
-
-        return(m)
       }
       if(!is.data.frame(CDM.table)){
-        return(m)
       }
 
-      GIS.level <- input$GIS.level
       GIS.leafletEstimate <- "std_sir"
 
       idxNum <- paste0("ID_", GIS.level)
@@ -33,7 +29,7 @@ leafletMapping <-  function(){
 
       #Color to fill the polygons
       pal <- colorQuantile("Greens", domain=tempGADM@data$mappingEstimate,
-                           n=10, probs = seq(0, 1, length.out = n + 1), na.color = "#808080",
+                           n=10, probs = seq(0, 1, length.out = 11), na.color = "#808080",
                            alpha = FALSE, reverse = FALSE)
 
 
@@ -49,7 +45,7 @@ leafletMapping <-  function(){
       #create leaflet map
 
       m <- m %>% addPolygons(data = tempGADM,
-                             fillColor= ~pal(mappingEstimate),
+                             fillColor= ~pal(tempGADM@data$mappingEstimate),
                              fillOpacity = 0.4,
                              weight = 2,
                              color = "white",
@@ -61,7 +57,7 @@ leafletMapping <-  function(){
                                dashArray = "",
                                fillOpacity = 0.7,
                                bringToFront = TRUE)) %>%
-        addLegend(pal = pal, values = ~mappingEstimate, opacity = 0.7, title = NULL,
+        addLegend(pal = pal, values = ~tempGADM@data$mappingEstimate, opacity = 0.7, title = NULL,
                   position = "bottomright")
 
       return(m)

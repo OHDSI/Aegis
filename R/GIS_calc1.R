@@ -1,4 +1,4 @@
-GIS.calc1 <- function(GIS.level, GIS.distribution, GIS.Age){
+GIS.calc1 <- function(GADM.table,CDM.table,GIS.level, GIS.distribution, GIS.Age){
 
   df <- dplyr::left_join(GADM.table, CDM.table, by=c("ID_2" = "gadm_id"))
   i <- GIS.level

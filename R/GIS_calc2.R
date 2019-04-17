@@ -1,4 +1,4 @@
-GIS.calc2 <- function(GIS.level, fraction){
+GIS.calc2 <- function(countdf_level,GADM,GIS.level, fraction){
   GIS.level <- as.numeric(GIS.level)
   GIS.level <- GIS.level + 1
   fraction <- as.numeric(fraction)
@@ -19,13 +19,13 @@ GIS.calc2 <- function(GIS.level, fraction){
             mapdf <- rbind(mapdf, tempdf)
           }
         }
-  
+
   if (isTRUE(GADM[[GIS.level]]@data[nrow(GADM[[GIS.level]]), "OBJECTID"] == GADM[[GIS.level]]@data[nrow(GADM[[GIS.level]]), id]) == TRUE) {
     mapdf$id2 <- mapdf$id
   } else {
     mapdf$id2[i] <- GADM[[GIS.level]]@data[which(GADM[[GIS.level]]@data[,"OBJECTID"] %in% mapdf$id[i]), id]
   }
-  
+
   mapdf <- dplyr::left_join(mapdf, countdf_level, by=c("id2"="id"))
   return(mapdf)
 }
