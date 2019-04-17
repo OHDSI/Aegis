@@ -1,88 +1,71 @@
-GIS.plot <- function(GIS.distribution, input.legend, input.title, GIS.Age){
+leafletMapping <-  function(GIS.level){
 
-  map <- GIS.background(GADM[[3]]@bbox, country)
-  switch(GIS.distribution,
-         "count"={
-           min_value <- min(mapdf$target_count)
-           max_value <- max(mapdf$target_count)
+  if(!exists("GADM[[1]]")){
+    m <- leaflet() %>%
+      addTiles %>%
+      fitBounds (
+        lng1="-179.1506", lng2="179.7734",
+        lat1="18.90986", lat2="72.6875")
+  }
+  if(!is.data.frame(CDM.table)){
+  }
 
-           plot <- map+
-             geom_polygon(data=mapdf,aes(x=long,y=lat,group=group,fill=target_count),alpha=0.8,colour="black",lwd=0.2)+
-             scale_fill_gradientn(colours = rev(heat.colors(5)), limit = c(min_value,max_value)) + labs(fill=input.legend) +
-             ggtitle(input.title) + theme(plot.title=element_text(face="bold", size=30, vjust=2, color="black")) +
-             theme(legend.title=element_text(size=20, face="bold")) + theme(legend.text = element_text(size=15)) + theme(legend.key.width=unit(2, "cm"), legend.key.height = unit(2,"cm"))
+  GIS.leafletEstimate <- "std_sir"
 
-           plot
-         },
-         "proportion"={
-           min_value <- min(mapdf$proportion)
-           max_value <- max(mapdf$proportion)
+  idxNum <- paste0("ID_", GIS.level)
+  idxName <- paste0("NAME_", GIS.level)
 
-           plot <- map+
-             geom_polygon(data=mapdf,aes(x=long,y=lat,group=group,fill=proportion),alpha=0.8,colour="black",lwd=0.2)+
-             scale_fill_gradientn(colours = rev(heat.colors(5)), limit = c(min_value,max_value)) + labs(fill=input.legend) +
-             ggtitle(input.title) + theme(plot.title=element_text(face="bold", size=30, vjust=2, color="black")) +
-             theme(legend.title=element_text(size=20, face="bold")) + theme(legend.text = element_text(size=15)) + theme(legend.key.width=unit(2, "cm"), legend.key.height = unit(2,"cm"))
+  tempGADM <- GADM[[GIS.level+1]]
+  tempGADM@data <- dplyr::left_join(GADM[[GIS.level+1]]@data, CDM.table, by = structure(names = idxNum ,"gadm_id"))
 
-           plot
-         },
-         "SIR"={
-           min_value <- min(mapdf$SIR)
-           max_value <- max(mapdf$SIR)
+  m <- leaflet(tempGADM) %>%
+    addTiles %>%
+    fitBounds (
+      lng1=GADM[[1]]@bbox[1,1], lng2=GADM[[1]]@bbox[1,2],
+      lat1=GADM[[1]]@bbox[2,1], lat2=GADM[[1]]@bbox[2,2])
 
-           plot <- map+
-             geom_polygon(data=mapdf,aes(x=long,y=lat,group=group,fill=SIR),alpha=0.8,colour="black",lwd=0.2)+
-             scale_fill_gradientn(colours = rev(heat.colors(5)), limit = c(min_value, max_value)) + labs(fill=input.legend) +
-             ggtitle(input.title) + theme(plot.title=element_text(face="bold", size=30, vjust=2, color="black")) +
-             theme(legend.title=element_text(size=20, face="bold")) + theme(legend.text = element_text(size=15)) + theme(legend.key.width=unit(2, "cm"), legend.key.height = unit(2,"cm"))
+  tempGADM@data$mappingEstimate <- tempGADM@data[,GIS.leafletEstimate]
+  #tempGADM@data[is.na(tempGADM@data[, "mappingEstimate"]), "mappingEstimate"] <- 0
 
-           plot
-         },
-         "BYM"={
-
-           a <- poly2nb(GADM[3][[1]])
-           nb2INLA("BayesianMap.graph", a)
-           a <- GADM
-           kr <- a[[3]]
-           nrow(CDM.table)
-           CDM.table$id2 <- CDM.table$gadm_id
-           kr@data <- dplyr::left_join(kr@data, CDM.table, by=c("ID_2" = "gadm_id"))
+  #Color to fill the polygons
+  pal <- colorQuantile("Greens", domain=tempGADM@data$mappingEstimate,
+                       n=10, probs = seq(0, 1, length.out = 11), na.color = "#2a1866",
+                       alpha = FALSE, reverse = FALSE)
 
 
-           switch(GIS.Age,
-                  "no"={
-                    m1 <- inla(outcome_count ~ 1 + f(ID_2, model = "iid") +
-                                 f(id2, model = "bym2", graph = "BayesianMap.graph", adjust.for.con.comp=TRUE), family = "poisson",
-                               data = as.data.frame(kr), E=crd_expected,
-                               control.predictor = list(compute = TRUE))
-                  },
-                  "yes"={
-                    m1 <- inla(outcome_count ~ 1 + f(ID_2, model = "iid") +
-                                 f(id2, model = "bym2", graph = "BayesianMap.graph", adjust.for.con.comp=TRUE), family = "poisson",
-                               data = as.data.frame(kr), E=std_expected,
-                               control.predictor = list(compute = TRUE))
-                  }
+  #pal <- colorBin("YlOrRd", domain = tempGADM@data$mappingEstimate, quantile(tempGADM@data$mappingEstimate, probs = c(0, 0.1, 0.25, 0.5, 0.75, 0.9, 1)))
 
-           )
+  #Estimates into pop up objects
+  polygon_popup <- paste0("<strong>Name: </strong>", tempGADM@data[, idxName], "<br>",
+                          "<strong>Target: </strong>", tempGADM@data$target_count, "<br>",
+                          "<strong>Outcome: </strong>", tempGADM@data$outcome_count, "<br>",
+                          "<strong>SIR: </strong>", round(tempGADM@data$std_sir, 2), " (", round(tempGADM@data$std_sirlower, 2), "-", round(tempGADM@data$std_sirupper, 2), ")", "<br>",
+                          "<strong>Proportion: </strong>", round(tempGADM@data$std_prop, 2), " (", round(tempGADM@data$std_proplower, 2), "-", round(tempGADM@data$std_propupper, 2), ")")
 
-           kr$RRmean <- m1$summary.fitted.values[, 1]
-           kr <- kr@data
+  #create leaflet map
 
-           min_value <- min(kr$RRmean)
-           max_value <- max(kr$RRmean)
+  m <- m %>% addPolygons(data = tempGADM,
+                         fillColor= ~pal(tempGADM@data$mappingEstimate),
+                         fillOpacity = 0.4,
+                         weight = 2,
+                         color = "white",
+                         dashArray = "3",
+                         popup = polygon_popup,
+                         highlight = highlightOptions(
+                           weight = 5,
+                           color = "#666",
+                           dashArray = "",
+                           fillOpacity = 0.7,
+                           bringToFront = TRUE)) %>%
+    addLegend(pal = pal, values = ~tempGADM@data$mappingEstimate, opacity = 0.7, title = NULL,
+              position = "bottomright")
 
-           mapdf <- mapdf %>%
-             left_join(dplyr::select(kr, RRmean, id2), by=c("id"="id2"))
+  return(m)
 
-           plot <- map+
-             geom_polygon(data=mapdf,aes(x=long,y=lat,group=group,fill=RRmean),alpha=0.8,colour="black",lwd=0.2)+
-             scale_fill_gradientn(colours = rev(heat.colors(5)), limit = c(min_value,max_value)) + labs(fill=input.legend) +
-             ggtitle(input.title) + theme(plot.title=element_text(face="bold", size=30, vjust=2, color="black")) +
-             theme(legend.title=element_text(size=20, face="bold")) + theme(legend.text = element_text(size=15)) + theme(legend.key.width=unit(2, "cm"), legend.key.height = unit(2,"cm"))
-
-           plot
-
-         }
-  )
-  return(plot)
 }
+
+
+# select 된 나라의 값을 가져온다.
+# select country 하면 Disease Mapping에 바로 나라 뜨기. => 처음에 나와야하는게 느릴경우 원하는 값을 볼때 더 느릴 수 있음
+# 팔레트 고를수 있고, 색 바뀌게 하기.
+# progressbar 도입.

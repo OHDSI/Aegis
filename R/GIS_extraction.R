@@ -1,20 +1,7 @@
-GIS.extraction<-function(connectionDetails, CDMschema, Resultschema, targettab="cohort", startdt, enddt, distinct,
+GIS.extraction<-function(cdmDatabaseSchema, resultDatabaseSchema, targettab="cohort", startdt, enddt,
                          tcdi, ocdi, fraction, timeatrisk_startdt, timeatrisk_enddt, timeatrisk_enddt_panel){
-  distinct <- distinct
-  startdt <- startdt
-  enddt <- enddt
-  tcdi <- tcdi
-  ocdi <- ocdi
+
   fraction <- as.numeric(fraction)
-  timeatrisk_startdt <- timeatrisk_startdt
-  timeatrisk_enddt <- timeatrisk_enddt
-  timeatrisk_enddt_panel <- timeatrisk_enddt_panel #params: @cohort_start_date and @cohort_end_date
-  connectionDetails <- connectionDetails
-  connection <- DatabaseConnector::connect(connectionDetails)
-  cdmDatabaseSchema <- paste0(CDMschema,".dbo")
-  resultDatabaseSchema <- paste0(Resultschema,".dbo")
-  targettab <- targettab
-  cdmVersion <- "5"
   Sys.setlocale(category="LC_CTYPE", locale="C")
 
   sql <-  "select top 1 * from @cdmDatabaseSchema.observation
@@ -37,7 +24,6 @@ GIS.extraction<-function(connectionDetails, CDMschema, Resultschema, targettab="
                               targettab=targettab,
                               startdt=startdt,
                               enddt=enddt,
-                              distinct=distinct,
                               tcdi=tcdi,
                               ocdi=ocdi,
                               timeatrisk_startdt=timeatrisk_startdt,
@@ -49,7 +35,7 @@ GIS.extraction<-function(connectionDetails, CDMschema, Resultschema, targettab="
 
   colnames(df) <- tolower(colnames(df))
   df[, c("outcome_count", "target_count")][is.na(df[, c("outcome_count", "target_count")])] <- 0
-  
+
   #Indirect age-adjustment
   cohort <- GIS.Indirect.AgeGenderadjust(df, fraction)
 

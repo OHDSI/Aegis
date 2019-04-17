@@ -68,11 +68,12 @@ shinyApp(
                   ,textInput("Resultschema","CDM Result schema","")
                   ,textInput("usr","USER","")
                   ,passwordInput("pw","PASSWORD","")
+                  ,textInput('WebapiDBserver','WebAPI DB Server IP','')
+                  ,textInput('WebapiDBname','WebAPI DB Name','')
+                  ,textInput('WebapiDBschema','WebAPI DB Schema','')
                   #input text to db information
                   ,actionButton("db_load","Load DB")
-                  #,hr()
-                  #,uiOutput("db_conn")
-                  #,actionButton("cohort_load","Load cohort")
+
                   ,width=2
                 ),
                 mainPanel(
@@ -93,8 +94,8 @@ shinyApp(
                   ,radioButtons("GIS.Age","Age and gender adjust",choices = c("No" = "no", "Yes"="yes"))
                   ,numericInput("GIS.timeatrisk_startdt","Define the time-at-risk window start, relative to target cohort entry:", 0, min=0)
                   ,numericInput("GIS.timeatrisk_enddt","Define the time-at-risk window end:", 0, min=0)
-                  ,selectInput("GIS.timeatrisk_enddt_panel","", choices =
-                                c("from cohort start date" = "cohort_start_date","from cohort end date" = "cohort_start_date"),selected = "cohort_end_date")
+                  ,selectInput("GIS.timeatrisk_enddt_panel","GIS.timeatrisk_enddt_panel", choices =
+                                 c("from cohort start date" = "cohort_start_date","from cohort end date" = "cohort_end_date"),selected = "cohort_end_date")
                   ,textInput("fraction","fraction",100000)
                   ,uiOutput("country_list")
                   ,actionButton("submit_table","submit")
@@ -120,7 +121,7 @@ shinyApp(
                 mainPanel(
                   #verbatimTextOutput("test")
                   #,
-                  plotOutput("GIS.plot")
+                  leafletOutput("GIS.plot")
                   #,textOutput("text")
                 )
               )
@@ -160,6 +161,17 @@ shinyApp(
   server <- function(input, output,session)
   {
 
+    #DataBase Connect
+    cohort_listup <- eventReactive(input$db_load, {
+      connectionDetails <<- DatabaseConnector::createConnectionDetails(dbms=input$sqltype,
+                                                                       server=input$ip,
+                                                                       schema=input$Resultschema,
+                                                                       user=input$usr,
+                                                                       password=input$pw)
+      connection <<- DatabaseConnector::connect(connectionDetails)
+      cohort_list <<- Call.Cohortlist(input$WebapiDBserver,input$WebapiDBname,input$WebapiDBschema,input$Resultschema)
+      })
+
     output$sqltype <- renderUI({
       selectInput("sqltype", "Select DBMS",
                   choices = c(
@@ -169,67 +181,39 @@ shinyApp(
                     "Microsoft Parallel Data Warehouse" = "pdw",
                     "IBM Netezza" = "netezza",
                     "Google BigQuery" = "bigquery"
-                              )
                   )
+      )
     })
-
 
     output$cohort_tcdi <- renderUI({
-      cohort_list <- cohort_listup()
-      if (length(cohort_list)>1) {
-        selectInput("tcdi", "Select target cohort", choices = cohort_list[,3])
-      } else {
-        selectInput("tcdi", "Select target cohort", choices = cohort_list[,1])
-      }
+        cohort_list <- cohort_listup()
+        selectInput("tcdi", "Select target cohort", choices = cohort_list)
     })
-
 
     output$cohort_ocdi <- renderUI({
       cohort_list <- cohort_listup()
-      #selectInput("ocdi", "Select outcome cohort", choices = cohort_list[,3])
-      if (length(cohort_list)>1) {
-          selectInput("ocdi", "Select target cohort", choices = cohort_list[,3])
-        } else {
-          selectInput("ocdi", "Select target cohort", choices = cohort_list[,1])
-        }
+      selectInput("ocdi", "Select target cohort", choices = cohort_list)
     })
-
 
     output$country_list <- renderUI({
       country_list <- GIS.countrylist()
       selectInput("country", "Select country", choices = country_list[,1])
     })
 
-    cohort_listup <- eventReactive(input$db_load, {
-      connectionDetails <<- DatabaseConnector::createConnectionDetails(dbms=input$sqltype,
-                                                                       server=input$ip,
-                                                                       schema=input$Resultschema,
-                                                                       user=input$usr,
-                                                                       password=input$pw)
-      connection <<- DatabaseConnector::connect(connectionDetails)
-      cohort_list <<- Call.Cohortlist(connectionDetails, connection, input$Resultschema)
-    })
-
-
+    ##cohort###################################################
     render.table <- eventReactive(input$submit_table,{
-      isolate({
-        country_list <<- GIS.countrylist()
-        country <<- input$country
-        MAX.level <<- country_list[country_list$NAME==country,3]
-        GADM <<- GIS.download(country, MAX.level)
+
+        country_list <- GIS.countrylist()
+        MAX.level <- country_list[country_list$NAME==input$country,3]
+        GADM <<- GIS.download(input$country, MAX.level)
         GADM.table <<- GADM[[3]]@data
 
-        #Conditional input cohort number
-        if (length(cohort_list)>1) {
-          tcdi <- cohort_list[which(cohort_list[,3] %in% input$tcdi == TRUE),1]
-          ocdi <- cohort_list[which(cohort_list[,3] %in% input$ocdi == TRUE),1]
-        } else {
-          tcdi <- input$tcdi
-          ocdi <- input$ocdi
-        }
+        tcdi <- substr(input$tcdi,1,gregexpr(' ',input$tcdi)[[1]][1]-1)
+        ocdi <- substr(input$ocdi,1,gregexpr(' ',input$ocdi)[[1]][1]-1)
 
-        CDM.table <<- AEGIS::GIS.extraction(connectionDetails, input$CDMschema, input$Resultschema, targettab="cohort", input$dateRange[1], input$dateRange[2], input$distinct,
-                                            tcdi, ocdi, input$fraction, input$GIS.timeatrisk_startdt, input$GIS.timeatrisk_enddt, input$GIS.timeatrisk_enddt_panel)
+        #Conditional input cohort number
+        CDM.table <<- GIS.extraction(input$CDMschema, input$Resultschema, targettab="cohort", input$dateRange[1], input$dateRange[2],
+                                     tcdi, ocdi, input$fraction, input$GIS.timeatrisk_startdt, input$GIS.timeatrisk_enddt, input$GIS.timeatrisk_enddt_panel)
         table <- dplyr::left_join(CDM.table, GADM.table, by=c("gadm_id" = "ID_2"))
         switch(input$GIS.Age,
                "no"={
@@ -246,71 +230,31 @@ shinyApp(
                }
 
         )
-      })
+
       table
     })
 
     output$GIS.table <- renderDataTable(
       render.table()
     )
+    ##cohort###################################################
 
+    ##disease##################################################
 
     draw.plot <- eventReactive(input$submit_plot,{
-      isolate({
-        GADM.table <<- GADM[[3]]@data
-        countdf_level <<- GIS.calc1(input$GIS.level, input$GIS.distribution, input$GIS.Age)
-        mapdf <<- GIS.calc2(input$GIS.level, input$fraction)
-        plot <- GIS.plot(input$GIS.distribution, input$plot.legend, input$plot.title, input$GIS.Age)
-      })
-      plot
+        countdf_level <<- GIS.calc1(GADM.table,CDM.table,input$GIS.level, input$GIS.distribution, input$GIS.Age)
+        mapdf <<- GIS.calc2(countdf_level,GADM,input$GIS.level, input$fraction)
+        plot <- leafletMapping(as.numeric(input$GIS.level))
+
     })
 
 
-    output$GIS.plot <- renderPlot ({
+    output$GIS.plot <- renderLeaflet ({
       draw.plot()
-    }, width = 1280, height = 1024, res = 100)
-
-
-     output$mappingLeaflet <- renderLeaflet({
-      leafletMapping()
-     })
-
-    #testing.cluster <- eventReactive(input$submit_cluster,{
-    #  isolate({
-    #    CDM.table$Observed <- CDM.table$outcome_count
-    #    test.summ <- DCluster::achisq.stat(CDM.table, lambda=1)
-    #  })
-    #  test.summ[[1]]
-    #})
-
-    #output$Cluster.test <- renderText({
-    #  testing.cluster()
-    #})
-
-    #finding.cluster <- eventReactive(input$submit_cluster,{
-    #  isolate({
-    #      table <- Cluster.find(input$Cluster.method, input$Cluster.parameter)
-    #  })
-    #  table
-    #})
-
-    #output$Cluster.table <- renderDataTable(
-    #  finding.cluster()
-    #)
-
-    plotting.cluster <- eventReactive(input$submit_cluster,{
-      isolate({
-        plot <- Cluster.plot(input$Cluster.method, input$Cluster.parameter, input$GIS.Age, input$country)
-      })
-      plot
     })
 
 
-
-    output$Cluster.plot <- renderPlot ({
-      plotting.cluster()
-    }, width = 1024, height = 800, res = 100)
-
+    ##disease##################################################
 
     ## End of server
   }, options = list(height = 1000)

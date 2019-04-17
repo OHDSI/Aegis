@@ -11,3 +11,5 @@ RoxygenNote: 6.0.1
 LazyData: true
 Imports:
   shiny
+Depends:
+    raster (== 2.6-7)
