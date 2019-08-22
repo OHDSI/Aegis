@@ -1,4 +1,4 @@
-GIS.plot <- function(GIS.distribution, input.legend, input.title, GIS.Age){
+GIS.plot <- function(GIS.distribution, input.legend, input.title, GIS.Age, country, GIS.level){
 
   map <- GIS.background(GADM[[3]]@bbox, country)
   switch(GIS.distribution,
@@ -40,11 +40,20 @@ GIS.plot <- function(GIS.distribution, input.legend, input.title, GIS.Age){
          },
          "BYM"={
 
-           a <- poly2nb(GADM[3][[1]])
-           nb2INLA("Korea.graph", a)
-           a <- GADM
-           kr <- a[[3]]
-           nrow(CDM.table)
+           country <- country
+           MAP.path <- paste0(paste0(.libPaths()[1],"/AEGIS/map"))
+           MAP.file <- paste0(paste0(country, "_", GIS.level,".graph"))
+           setwd(MAP.path)
+
+           if(!file.exists(MAP.path))
+           dir.create(MAP.path)
+
+           if(!file.exists(file.path(MAP.path, MAP.file))){
+               a <- poly2nb(GADM[GIS.level][[1]])
+               nb2INLA(file.path(MAP.path, MAP.file), a)
+           }
+
+           kr <- GADM[[GIS.level]]
            CDM.table$id2 <- CDM.table$gadm_id
            kr@data <- dplyr::left_join(kr@data, CDM.table, by=c("ID_2" = "gadm_id"))
 
@@ -52,13 +61,13 @@ GIS.plot <- function(GIS.distribution, input.legend, input.title, GIS.Age){
            switch(GIS.Age,
                   "no"={
                     m1 <- inla(outcome_count ~ 1 + f(ID_2, model = "iid") +
-                                 f(id2, model = "bym2", graph = "Korea.graph", adjust.for.con.comp=TRUE), family = "poisson",
+                                 f(id2, model = "bym2", graph = file.path(MAP.path, MAP.file), adjust.for.con.comp=TRUE), family = "poisson",
                                data = as.data.frame(kr), E=crd_expected,
                                control.predictor = list(compute = TRUE))
                   },
-                  "no"={
+                  "yes"={
                     m1 <- inla(outcome_count ~ 1 + f(ID_2, model = "iid") +
-                                 f(id2, model = "bym2", graph = "Korea.graph", adjust.for.con.comp=TRUE), family = "poisson",
+                                 f(id2, model = "bym2", graph = file.path(MAP.path, MAP.file), adjust.for.con.comp=TRUE), family = "poisson",
                                data = as.data.frame(kr), E=std_expected,
                                control.predictor = list(compute = TRUE))
                   }

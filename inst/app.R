@@ -125,6 +125,8 @@ shinyApp(
       ),
 
 
+
+
       tabItem(tabName ="Clustering",
               fluidRow(
                 titlePanel("Disease clustering"),
@@ -249,7 +251,7 @@ shinyApp(
         GADM.table <<- GADM[[3]]@data
         countdf_level <<- GIS.calc1(input$GIS.level, input$GIS.distribution, input$GIS.Age)
         mapdf <<- GIS.calc2(input$GIS.level, input$fraction)
-        plot <- GIS.plot(input$GIS.distribution, input$plot.legend, input$plot.title, input$GIS.Age)
+        plot <- GIS.plot(input$GIS.distribution, input$plot.legend, input$plot.title, input$GIS.Age, input$country, input$GIS.level)
       })
       plot
     })
@@ -257,6 +259,15 @@ shinyApp(
     output$GIS.plot <- renderPlot ({
       draw.plot()
     }, width = 1280, height = 1024, res = 100)
+
+
+
+    # 현재 여기 설정중~!@~!@~!@~!@
+    # draw.leaflet <-
+    #
+    # output$mappingLeaflet <- renderLeaflet({
+    #   AEGIS::leafletMapping()
+    # })
 
     #testing.cluster <- eventReactive(input$submit_cluster,{
     #  isolate({

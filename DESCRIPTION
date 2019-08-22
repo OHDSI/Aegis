@@ -10,5 +10,4 @@ Encoding: UTF-8
 RoxygenNote: 6.0.1
 LazyData: true
 Imports:
-  dplyr,
   shiny

@@ -86,7 +86,7 @@
        SELECT a.* 
        into #person_temp
        FROM @resultDatabaseSchema.cohort a 
-       WHERE COHORT_DEFINITION_ID = 1
+       WHERE COHORT_DEFINITION_ID = @tcdi
 
 
        SELECT a.*, b.location_id, 

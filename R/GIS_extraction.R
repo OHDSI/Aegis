@@ -49,7 +49,8 @@ GIS.extraction<-function(connectionDetails, CDMschema, Resultschema, targettab="
 
   colnames(df) <- tolower(colnames(df))
   df[, c("outcome_count", "target_count")][is.na(df[, c("outcome_count", "target_count")])] <- 0
-  
+  df <<- df
+
   #Indirect age-adjustment
   cohort <- GIS.Indirect.AgeGenderadjust(df, fraction)
 

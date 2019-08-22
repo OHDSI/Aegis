@@ -146,7 +146,7 @@ Cluster.plot <- function(method, parameter, GIS.Age, country){
     )
 
     result <<- kulldorff(geo, cases, population, expected.cases, pop.upper.bound,
-                         n.simulations, alpha.level, plot)
+                         n.simulations, alpha.level, plot=FALSE)
 
     df_2 <- GADM.table
     df_2$cluster <- ifelse(
