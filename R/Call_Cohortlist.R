@@ -1,4 +1,4 @@
-Call.Cohortlist<-function(WebapiDBserver,WebapiDBname,WebapiDBschema,Resultschema, targettab="cohort", cdmVersion="5"){
+Call.Cohortlist<-function(WebapiDBserver,WebapiDBschema,Resultschema, targettab="cohort", cdmVersion="5"){
 
   Sys.setlocale(category="LC_CTYPE", locale="C")
   ## Check if a cohort exists
@@ -12,10 +12,9 @@ Call.Cohortlist<-function(WebapiDBserver,WebapiDBname,WebapiDBschema,Resultschem
   cohort<-DatabaseConnector::querySql(connection, sql)
 
   ##Check Cohort Definition
-  sql <- 'SELECT name,id FROM [@WebapiDBserver].@WebapiDBname.@WebapiDBschema.cohort_definition'
+  sql <- 'SELECT name,id FROM @WebapiDBserver@WebapiDBschema.cohort_definition'
   sql <- SqlRender::renderSql(sql,
-                              WebapiDBserver=WebapiDBserver,
-                              WebapiDBname=WebapiDBname,
+                              WebapiDBserver=if(WebapiDBserver==''){WebapiDBserver=''}else(WebapiDBserver= paste0('[',WebapiDBserver,']','.')),
                               WebapiDBschema=WebapiDBschema)$sql
   sql <- SqlRender::translateSql(sql,
                                  targetDialect=connectionDetails$dbms)$sql
