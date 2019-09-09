@@ -1,7 +1,8 @@
-GIS.extraction<-function(cdmDatabaseSchema, resultDatabaseSchema, targettab="cohort", startdt, enddt,
+GIS.extraction<-function(connectionDetails, cdmDatabaseSchema, resultDatabaseSchema, targettab="cohort", startdt, enddt,
                          tcdi, ocdi, fraction, timeatrisk_startdt, timeatrisk_enddt, timeatrisk_enddt_panel){
 
-  fraction <- as.numeric(fraction)
+  connection <- DatabaseConnector::connect(connectionDetails = connectionDetails)
+
   Sys.setlocale(category="LC_CTYPE", locale="C")
 
   sql <-  "select top 1 * from @cdmDatabaseSchema.observation
@@ -17,7 +18,7 @@ GIS.extraction<-function(cdmDatabaseSchema, resultDatabaseSchema, targettab="coh
          temp <- paste0(.libPaths()[1],"/AEGIS/data/LOCATION_IN_OBSERVATION.sql"))  #in observation
 
 
-  sql <- readSql(temp)
+  sql <- SqlRender::readSql(temp)
   sql <- SqlRender::renderSql(sql,
                               cdmDatabaseSchema=cdmDatabaseSchema,
                               resultDatabaseSchema=resultDatabaseSchema,
@@ -37,7 +38,7 @@ GIS.extraction<-function(cdmDatabaseSchema, resultDatabaseSchema, targettab="coh
   df[, c("outcome_count", "target_count")][is.na(df[, c("outcome_count", "target_count")])] <- 0
 
   #Indirect age-adjustment
-  cohort <- GIS.Indirect.AgeGenderadjust(df, fraction)
+  cohort <- GIS.Indirect.AgeGenderadjust(df, as.numeric(fraction))
 
   return(cohort)
 }

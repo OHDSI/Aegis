@@ -47,6 +47,7 @@ GIS.calc1 <- function(GADM.table,CDM.table,GIS.level, GIS.distribution, GIS.Age)
 
 
     )
-  countdf_level <- na.omit(temp_df)
+  temp_df[is.na(temp_df[, "target_count"]), "target_count"] <- 0
+  countdf_level <- temp_df
   return(countdf_level)
 }
