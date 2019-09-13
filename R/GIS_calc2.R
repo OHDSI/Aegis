@@ -1,4 +1,4 @@
-GIS.calc2 <- function(countdf_level,GADM,GIS.level, fraction){
+GIS.calc2 <- function(countdf_level, GADM, GIS.level, fraction){
   GIS.level <- as.numeric(GIS.level)
   GIS.level <- GIS.level + 1
   fraction <- as.numeric(fraction)

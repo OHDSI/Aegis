@@ -1,4 +1,4 @@
-GIS.download <- function(country, MAX.level){
+GIS.download <- function(country, maxLevel){
 
   GADM.path <- paste0(.libPaths()[1], "/AEGIS/map/", country)
   GADM.file <- paste0("GADM_2.8_",country,"_adm_total.rda")
@@ -12,7 +12,7 @@ GIS.download <- function(country, MAX.level){
 
   if(!file.exists(file.path(GADM.path, GADM.file))){
     GADM_list <- list()
-    for(i in 0:MAX.level){
+    for(i in 0:maxLevel){
       j <- i+1
       x <- raster::getData("GADM", country=country, level=i)
       GADM_list[[j]] <- x

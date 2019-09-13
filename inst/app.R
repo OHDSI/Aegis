@@ -36,6 +36,8 @@ packages(lubridate)
 packages(rgdal)
 packages(gpclib)
 packages(rgeos)
+packages(RColorBrewer)
+packages(leafpop)
 
 #INLA package is very heavy
 #So, INLA packages must be downloaded separately
@@ -69,6 +71,7 @@ shinyApp(
                   ,passwordInput("pw","PASSWORD","")
                   ,textInput('WebapiDBserver','WebAPI DB Server IP','',placeholder = 'xxx.xxx.xxx.xxx')
                   ,textInput('WebapiDBschema','WebAPI DB Schema','',placeholder = 'yourWebAPIDb.schema')
+                  ,uiOutput("country_list")
                   #input text to db information
                   ,actionButton("db_load","Load DB")
 
@@ -76,7 +79,9 @@ shinyApp(
                 ),
                 mainPanel
                 (
-                  tableOutput("view")
+                  dataTableOutput('GIS.preTable'),
+                  leafletOutput(outputId = "GIS.leafletPre", height = 400),
+                  plotOutput(outputId = "GIS.demographics")
                 )
               )
       ),
@@ -95,7 +100,6 @@ shinyApp(
                   ,selectInput("GIS.timeatrisk_enddt_panel","GIS.timeatrisk_enddt_panel", choices =
                                  c("from cohort start date" = "cohort_start_date","from cohort end date" = "cohort_end_date"),selected = "cohort_end_date")
                   ,textInput("fraction","fraction",100000)
-                  ,uiOutput("country_list")
                   ,actionButton("submit_table","submit")
                   ,width=2
                 ),
@@ -145,15 +149,138 @@ shinyApp(
   #define server for dataset handling and spatial statistical calculation
   server <- function(input, output,session)
   {
+    #country list
+    output$country_list <- renderUI({
+      country_list <<- GIS.countrylist()
+      maxLevel <<- country_list[country_list$NAME == input$country,]$MAX_LEVEL
+      selectInput("country", "Select country", choices = country_list[,1])
+    })
 
-    #DataBase Connect
-    cohort_listup <- eventReactive(input$db_load, {
+    ################
+    render.preTable <- eventReactive(input$db_load,{
       connectionDetails <<- DatabaseConnector::createConnectionDetails(dbms=input$sqltype,
                                                                        server=input$ip,
                                                                        schema=input$Resultschema,
                                                                        user=input$usr,
                                                                        password=input$pw)
       connection <<- DatabaseConnector::connect(connectionDetails)
+
+      GADM <<- GIS.download(input$country, maxLevel)
+      preTable <<- PIP(input$CDMschema, maxLevel, input$country)
+      country <<- input$country
+      preTable
+      })
+
+    output$GIS.preTable <- renderDataTable(
+        datatable(render.preTable(), options = list(pageLength = 7,
+                                                    autoWidth = TRUE),
+                                     selection = "single")
+    )
+
+    output$GIS.leafletPre <- renderLeaflet({
+      if(!exists("GADM")){
+        leaflet() %>%
+          addTiles %>%
+          fitBounds (
+            lng1="-179.1506", lng2="179.7734",
+            lat1="18.90986", lat2="72.6875")
+      } else {
+        leaflet() %>%
+          addTiles %>%
+          fitBounds (
+            lng1=GADM[[1]]@bbox[1,1], lng2=GADM[[1]]@bbox[1,2],
+            lat1=GADM[[1]]@bbox[2,1], lat2=GADM[[1]]@bbox[2,2])
+      }
+    })
+
+
+    observeEvent(input$GIS.preTable_rows_selected, {
+
+      row_selected <- render.preTable()[input$GIS.preTable_rows_selected,]
+
+      idxNum <- row_selected[,"objectid"]
+      idxName <- paste0("NAME_", maxLevel)
+      idxList <- preTable[which(preTable[,"objectid"]==idxNum),1]
+      lng <- row_selected[,"longitude"]
+      lat <- row_selected[,"latitude"]
+
+      preGADM <- GADM[[3]][idxNum,]
+
+      sql <- "select cast(year_of_birth as int) as year_of_birth, cast(gender_concept_id as int) as gender_concept_id,
+            cast(location_id as int) as location_id from @cdmDatabaseSchema.person
+      where location_id in (@idxList)"
+      sql <- SqlRender::renderSql(sql,
+                                  cdmDatabaseSchema=input$CDMschema,
+                                  idxList=idxList)$sql
+      sql <- SqlRender::translateSql(sql,
+                                     targetDialect=connectionDetails$dbms)$sql
+      person <- DatabaseConnector::querySql(connection, sql)
+      colnames(person) <- tolower(colnames(person))
+      person$gender_concept_id <- factor(person$gender_concept_id)
+
+      mu <- data.frame(person %>%
+                         group_by(gender_concept_id) %>%
+                         summarise(mean = mean(year_of_birth)))
+
+      p <- ggplot(person, aes(x=year_of_birth, color=gender_concept_id)) +
+        geom_density(alpha=0.3, aes(fill=gender_concept_id))
+      p.data <- ggplot_build(p)$data[[1]]
+      p.text <- lapply(split(p.data, f = p.data$group), function(df){
+        df[which.max(df$scaled), ]
+      })
+      p.text <- do.call(rbind, p.text)
+      p.text$rate <- p.text$n/sum(p.text$n)
+      p <- p + annotate('text', x = p.text$x, y = p.text$y,
+                        label = sprintf('n = %d, (%.2f)', p.text$n, p.text$rate), vjust = 0, col = c("red", "blue"))
+
+      proxy <- leafletProxy('GIS.leafletPre')
+      # prePopup = paste("<strong>Location id: </strong>", preTable[idxNum,"location_id"], "<br>",
+      #                "<strong>GADM id: </strong>", preTable[idxNum,"objectid"], "<br>",
+      #                "<strong>Coordinates: </strong>", preTable[idxNum,"longitude"], ", ", preTable[idxNum,"latitude"], "<br>",
+      #                "<strong>Administrative name: </strong>", preGADM@data[,idxName])
+
+    #   proxy %>%
+    #     clearShapes() %>%
+    #     clearControls() %>%
+    #       addPolygons(data = preGADM,
+    #         fillColor= "yellow",
+    #         fillOpacity = 0.5,
+    #         weight = 1,
+    #         color = "black",
+    #         dashArray = "3",
+    #         popup = popupGraph(p),
+    #         highlight = highlightOptions(
+    #           weight = 5,
+    #           color = "#666",
+    #           dashArray = "",
+    #           fillOpacity = 0.7,
+    #           bringToFront = TRUE)) %>%
+    #             setView(lng = lng, lat = lat, zoom = 11)
+    #
+    # })
+
+      proxy %>%
+        clearShapes() %>%
+        clearControls() %>%
+        addPolygons(data = preGADM,
+                    fillColor= "yellow",
+                    fillOpacity = 0.5,
+                    weight = 1,
+                    color = "black",
+                    dashArray = "3",
+                    popup = leafpop::popupGraph(p),
+                    highlight = highlightOptions(
+                      weight = 5,
+                      color = "#666",
+                      dashArray = "",
+                      fillOpacity = 0.7,
+                      bringToFront = TRUE)) %>%
+        setView(lng = lng, lat = lat, zoom = 11)
+
+    })
+    ####################
+
+    cohort_listup <- eventReactive(input$db_load, {
       cohort_list <<- Call.Cohortlist(input$WebapiDBserver,input$WebapiDBschema,input$Resultschema)
       })
 
@@ -180,23 +307,15 @@ shinyApp(
       selectInput("ocdi", "Select target cohort", choices = cohort_list)
     })
 
-    output$country_list <- renderUI({
-      country_list <<- GIS.countrylist()
-      selectInput("country", "Select country", choices = country_list[,1])
-    })
-
 
     ##define Administrative level##############################
     output$GIS.level<-renderUI({
-
-      maxLevel <- country_list[country_list$NAME == input$country,]$MAX_LEVEL
+      #maxLevel <- country_list[country_list$NAME == input$country,]$MAX_LEVEL
       radioButtons("GIS.level", "Administrative level",
-                   choices = c(rep(0:maxLevel)),
-                   selected = 0
+                   choices = c(rep(1:maxLevel)),
+                   selected = maxLevel
       )
-
       })
-
 
     ###########################################################
 
@@ -205,16 +324,14 @@ shinyApp(
     render.table <- eventReactive(input$submit_table,{
 
         country_list <- GIS.countrylist()
-        MAX.level <- country_list[country_list$NAME==input$country,3]
-        GADM <<- GIS.download(input$country, MAX.level)
-        GADM.table <<- GADM[[MAX.level+1]]@data
+        GADM.table <<- GADM[[maxLevel+1]]@data
 
         tcdi <<- substr(input$tcdi,1,gregexpr(' ',input$tcdi)[[1]][1]-1)
         ocdi <<- substr(input$ocdi,1,gregexpr(' ',input$ocdi)[[1]][1]-1)
 
         #Conditional input cohort number
         CDM.table <<- GIS.extraction(connectionDetails,input$CDMschema, input$Resultschema, targettab="cohort", input$dateRange[1], input$dateRange[2],
-                                     tcdi, ocdi, input$fraction, input$GIS.timeatrisk_startdt, input$GIS.timeatrisk_enddt, input$GIS.timeatrisk_enddt_panel)
+                                     tcdi, ocdi, input$fraction, input$GIS.timeatrisk_startdt, input$GIS.timeatrisk_enddt, input$GIS.timeatrisk_enddt_panel, maxLevel)
 
         table <- dplyr::left_join(CDM.table, GADM.table, by=c("gadm_id" = "ID_2"))
         switch(input$GIS.age,
@@ -257,23 +374,34 @@ shinyApp(
     })
 
     observeEvent(input$submit_plot,{
-        countdf_level <<- GIS.calc1(GADM.table, CDM.table, input$GIS.level, input$GIS.distribution, input$GIS.age)
-        mapdf <<- GIS.calc2(countdf_level,GADM,input$GIS.level, input$fraction)
+        #countdf_level <<- GIS.calc1(GADM.table, CDM.table, input$GIS.level, input$GIS.distribution, input$GIS.age)
+        GIS.level <<- as.numeric(input$GIS.level)
+        GIS.agel <<- input$GIS.age
         tableProxy <<- AEGIS::leafletMapping(as.numeric(input$GIS.level), input$GIS.age, input$GIS.distribution, input$country)
 
+        idxNum <- paste0("ID_", input$GIS.level)
+        idxName <- paste0("NAME_", input$GIS.level)
+
           #Color to fill the polygons
-          pal <- colorQuantile(input$colorsMapping, domain=tableProxy@data$mappingEstimate,
-                               n=7, probs = seq(0, 1, length.out = 8), na.color = "#FFFFFF",
-                               alpha = FALSE, reverse = FALSE)
+          if (length(tableProxy)==1) {
+            pal <- colorQuantile(input$colorsMapping, domain=tableProxy@data$mappingEstimate,
+                                 n=0, probs = seq(0, 1, length.out = 1), na.color = "#FFFFFF",
+                                 alpha = FALSE, reverse = FALSE)
+          } else {
+            pal <- colorQuantile(input$colorsMapping, domain=tableProxy@data$mappingEstimate,
+                                 n=7, probs = seq(0, 1, length.out = 8), na.color = "#FFFFFF",
+                                 alpha = FALSE, reverse = FALSE)
+          }
+
           #Estimates into pop up objects
           if (input$GIS.age == "yes"){
-            polygon_popup <- paste0("<strong>Name: </strong>", tableProxy@data$idxName, "<br>",
+            polygon_popup <- paste0("<strong>Name: </strong>", tableProxy@data[,idxName], "<br>",
                                     "<strong>Target: </strong>", tableProxy@data$target_count, "<br>",
                                     "<strong>Outcome: </strong>", tableProxy@data$outcome_count, "<br>",
                                     "<strong>SIR: </strong>", round(tableProxy@data$std_sir, 2), " (", round(tableProxy@data$std_sirlower, 2), "-", round(tableProxy@data$std_sirupper, 2), ")", "<br>",
                                     "<strong>Proportion: </strong>", round(tableProxy@data$std_prop, 2), " (", round(tableProxy@data$std_proplower, 2), "-", round(tableProxy@data$std_propupper, 2), ")")
           } else {
-            polygon_popup <- paste0("<strong>Name: </strong>", tableProxy@data$idxName, "<br>",
+            polygon_popup <- paste0("<strong>Name: </strong>", tableProxy@data[,idxName], "<br>",
                                     "<strong>Target: </strong>", tableProxy@data$target_count, "<br>",
                                     "<strong>Outcome: </strong>", tableProxy@data$outcome_count, "<br>",
                                     "<strong>SIR: </strong>", round(tableProxy@data$crd_sir, 2), " (", round(tableProxy@data$crd_sirlower, 2), "-", round(tableProxy@data$crd_sirupper, 2), ")", "<br>",
@@ -283,7 +411,7 @@ shinyApp(
           leafletProxy("GIS.leafletMapping", data = tableProxy) %>%
             clearShapes() %>%
             clearControls() %>%
-            addPolygons(#data = tableProxy,
+            leaflet::addPolygons(#data = tableProxy,
               fillColor= ~pal(tableProxy@data$mappingEstimate),
               fillOpacity = 0.5,
               weight = 1,
@@ -301,19 +429,51 @@ shinyApp(
       })
 
     ##Clustering###############################################
-    draw.leafletClustering <- eventReactive(input$submit_cluster,{
-      plot <- Cluster.plot(input$Cluster.method, input$Cluster.parameter,input$GIS.age, input$country,GADM,as.numeric(input$GIS.level))
+
+
+    observeEvent(input$submit_cluster,{
+
+
+      #Estimates into pop up objects
+      clustertableProxy <- leafletClustering(input$parameter, input$GIS.age, as.numeric(input$GIS.level), input$colorsClustering)
+
+      clusterpolygon_popup <- paste0("<strong>population: </strong>", tempGADM@data$population,"<br>",
+                              "<strong>number.of.cases: </strong>", tempGADM@data$number.of.cases,"<br>",
+                              "<strong>expected.cases: </strong>", round(tempGADM@data$expected.cases,4),"<br>",
+                              "<strong>SMR: </strong>", round(tempGADM@data$SMR,4),"<br>",
+                              "<strong>log.likelihood.ratio: </strong>", round(tempGADM@data$log.likelihood.ratio,4),"<br>",
+                              "<strong>p.value: </strong>", round(tempGADM@data$p.value,3),"<br>"
+      )
+      #Incremental changes to the map
+      leafletProxy("GIS.leafletClustering", data = clustertableProxy) %>%
+        clearShapes() %>%
+        clearControls() %>%
+        leaflet::addPolygons(#data = tableProxy,
+          fillColor= ~pal(clustertableProxy@data$k.cluster),
+          fillOpacity = 0.5,
+          weight = 1,
+          color = "black",
+          dashArray = "3",
+          popup = clusterpolygon_popup,
+          highlight = highlightOptions(
+            weight = 5,
+            color = "#666",
+            dashArray = "",
+            fillOpacity = 0.7,
+            bringToFront = TRUE)) %>%
+        addLegend(pal = pal, values = tableProxy@data$k.cluster, opacity = 0.7, title = NULL,
+                  position = "bottomright")
     })
 
-    output$GIS.leafletClusering <- renderLeaflet({
+    output$GIS.leafletClustering <- renderLeaflet({
       if(!exists("GADM")){
-        m <- leaflet() %>%
+        leaflet() %>%
           addTiles %>%
           fitBounds (
             lng1="-179.1506", lng2="179.7734",
             lat1="18.90986", lat2="72.6875")
       } else {
-        m <- leaflet() %>%
+        leaflet() %>%
           addTiles %>%
           fitBounds (
             lng1=GADM[[1]]@bbox[1,1], lng2=GADM[[1]]@bbox[1,2],

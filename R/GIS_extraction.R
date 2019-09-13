@@ -1,7 +1,8 @@
 GIS.extraction<-function(connectionDetails, cdmDatabaseSchema, resultDatabaseSchema, targettab="cohort", startdt, enddt,
-                         tcdi, ocdi, fraction, timeatrisk_startdt, timeatrisk_enddt, timeatrisk_enddt_panel){
+                         tcdi, ocdi, fraction, timeatrisk_startdt, timeatrisk_enddt, timeatrisk_enddt_panel, maxLevel){
 
   connection <- DatabaseConnector::connect(connectionDetails = connectionDetails)
+  maxLevel <- maxLevel
 
   Sys.setlocale(category="LC_CTYPE", locale="C")
 
