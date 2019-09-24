@@ -4,19 +4,22 @@ leafletClustering <- function(parameter, GIS.age, GIS.level, colorsClustering){
   GIS.age <- GIS.age
   GIS.level <- as.numeric(GIS.level)
 
-  idxNum <- paste0("ID_", GIS.level)
-  idxName <- paste0("NAME_", GIS.level)
+  # idxNum <- paste0("ID_", GIS.level)
+  # idxName <- paste0("NAME_", GIS.level)
+  idxNum <- paste0("ID_2")
+  idxName <- paste0("NAME_2")
   country <- country
 
-  tempGADM <- GADM[[GIS.level+1]]@data
-  tempGADM <- dplyr::left_join(GADM[[GIS.level+1]]@data, CDM.table, by = structure(names = idxNum ,"gadm_id"))
+  tempGADM <- GADM[[3]]@data
+  #tempGADM <- dplyr::left_join(GADM[[3]]@data, CDM.table, by = structure(names = idxNum ,"gadm_id"))
+  tempGADM <- dplyr::left_join(GADM[[3]]@data, CDM.table, by=c("ID_2" = "gadm_id"))
 
   gadm_id <- tempGADM[,"OBJECTID"]
 
   ls <- list()
   for(i in 1:length(gadm_id)) {
     idx <- gadm_id[i]
-    geo<-GADM[[GIS.level+1]]@polygons[[idx]]
+    geo<-GADM[[3]]@polygons[[idx]]
     a<-idx
     y<-geo@labpt[1]
     x<-geo@labpt[2]
@@ -29,11 +32,11 @@ leafletClustering <- function(parameter, GIS.age, GIS.level, colorsClustering){
 
   geo <- SpatialEpi::latlong2grid(df[, c(2,3)])
 
-  pop.upper.bound <- parameter
+  pop.upper.bound <- as.numeric(parameter)
   n.simulations <- 999
   alpha.level <- 0.05
   n.strata <- 16
-  plot <- TRUE
+  plot <- FALSE
 
   df <- dplyr::left_join(CDM.table, df, by=c("gadm_id" = "a"))
 
@@ -55,6 +58,7 @@ leafletClustering <- function(parameter, GIS.age, GIS.level, colorsClustering){
 
   result <- SpatialEpi::kulldorff(geo, cases, population, expected.cases, pop.upper.bound,
                                   n.simulations, alpha.level, plot=FALSE)
+
   n.cluster <- 1 + length(result$secondary.clusters)
 
   cluster.indexs <- list(result$most.likely.cluster)
@@ -91,7 +95,7 @@ leafletClustering <- function(parameter, GIS.age, GIS.level, colorsClustering){
   #
 
   #create leaflet map
-  polydf <- rgeos::gSimplify(GADM[[GIS.level+1]], tol=0.01, topologyPreserve=TRUE)
+  polydf <- rgeos::gSimplify(GADM[[3]], tol=0.01, topologyPreserve=TRUE)
   tempGADM <- SpatialPolygonsDataFrame(polydf, data=tempGADM)
   tableProxy <- tempGADM
   return(tableProxy)

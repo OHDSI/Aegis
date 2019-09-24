@@ -37,6 +37,7 @@ packages(rgdal)
 packages(gpclib)
 packages(rgeos)
 packages(RColorBrewer)
+packages(DT)
 packages(leafpop)
 
 #INLA package is very heavy
@@ -79,7 +80,7 @@ shinyApp(
                 ),
                 mainPanel
                 (
-                  dataTableOutput('GIS.preTable'),
+                  div(dataTableOutput('GIS.preTable'),style='font-size: 70%;'),
                   leafletOutput(outputId = "GIS.leafletPre", height = 400),
                   plotOutput(outputId = "GIS.demographics")
                 )
@@ -105,7 +106,7 @@ shinyApp(
                 ),
                 mainPanel
                 (
-                  dataTableOutput('GIS.table')
+                  div(dataTableOutput('GIS.table'),style='font-size: 90%;')
                 )
               )
       ),
@@ -121,7 +122,7 @@ shinyApp(
                   ,width=2
                 ),
                 mainPanel(
-                  leafletOutput(outputId = "GIS.leafletMapping", height = 800)
+                  leafletOutput(outputId = "GIS.leafletMapping", height = 600)
                 )
               )
       ),
@@ -137,7 +138,7 @@ shinyApp(
                   ,width=2
                 ),
                 mainPanel(
-                  leafletOutput(outputId = "GIS.leafletClustering", height = 800)
+                  leafletOutput(outputId = "GIS.leafletClustering", height = 600)
                 )
               )
               )
@@ -151,8 +152,7 @@ shinyApp(
   {
     #country list
     output$country_list <- renderUI({
-      country_list <<- GIS.countrylist()
-      maxLevel <<- country_list[country_list$NAME == input$country,]$MAX_LEVEL
+      country_list <- GIS.countrylist()
       selectInput("country", "Select country", choices = country_list[,1])
     })
 
@@ -164,7 +164,7 @@ shinyApp(
                                                                        user=input$usr,
                                                                        password=input$pw)
       connection <<- DatabaseConnector::connect(connectionDetails)
-
+      maxLevel <<- country_list[country_list$NAME == input$country,]$MAX_LEVEL
       GADM <<- GIS.download(input$country, maxLevel)
       preTable <<- PIP(input$CDMschema, maxLevel, input$country)
       country <<- input$country
@@ -172,10 +172,12 @@ shinyApp(
       })
 
     output$GIS.preTable <- renderDataTable(
-        datatable(render.preTable(), options = list(pageLength = 7,
-                                                    autoWidth = TRUE),
-                                     selection = "single")
-    )
+         DT::datatable(render.preTable(), options = list(pageLength = 7,
+                                                     autoWidth = TRUE,
+                                                     columnDefs = list(list(width='200px',targets='_all'))
+                                                     ),
+                                      selection = "single")
+     )
 
     output$GIS.leafletPre <- renderLeaflet({
       if(!exists("GADM")){
@@ -329,6 +331,15 @@ shinyApp(
         tcdi <<- substr(input$tcdi,1,gregexpr(' ',input$tcdi)[[1]][1]-1)
         ocdi <<- substr(input$ocdi,1,gregexpr(' ',input$ocdi)[[1]][1]-1)
 
+
+        cdmDatabaseSchema <<- input$CDMschema
+        resultDatabaseSchema <<- input$Resultschema
+        startdt <<- input$dateRange[1]
+        enddt <<- input$dateRange[2]
+        timeatrisk_startdt <<- input$GIS.timeatrisk_startdt
+        timeatrisk_enddt <<- input$GIS.timeatrisk_enddt
+        timeatrisk_enddt_panel <<- input$GIS.timeatrisk_enddt_panel
+
         #Conditional input cohort number
         CDM.table <<- GIS.extraction(connectionDetails,input$CDMschema, input$Resultschema, targettab="cohort", input$dateRange[1], input$dateRange[2],
                                      tcdi, ocdi, input$fraction, input$GIS.timeatrisk_startdt, input$GIS.timeatrisk_enddt, input$GIS.timeatrisk_enddt_panel, maxLevel)
@@ -336,13 +347,13 @@ shinyApp(
         table <- dplyr::left_join(CDM.table, GADM.table, by=c("gadm_id" = "ID_2"))
         switch(input$GIS.age,
                "no"={
-                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1", "NAME_2",
+                 table <- table[, c("ID_1", "NAME_1", "NAME_2",
                                     "target_count", "outcome_count", "crd_expected", "crd_prop", "crd_sir"
                  )]#"ID_2"
 
                },
                "yes"={
-                 table <- table[, c("OBJECTID","ID_0", "ISO", "NAME_0", "ID_1", "NAME_1",  "NAME_2",
+                 table <- table[, c("ID_1", "NAME_1",  "NAME_2",
                                     "target_count", "outcome_count", "std_expected", "std_prop", "std_sir"
                  )]#"ID_2",
 
@@ -376,7 +387,7 @@ shinyApp(
     observeEvent(input$submit_plot,{
         #countdf_level <<- GIS.calc1(GADM.table, CDM.table, input$GIS.level, input$GIS.distribution, input$GIS.age)
         GIS.level <<- as.numeric(input$GIS.level)
-        GIS.agel <<- input$GIS.age
+        GIS.age <<- input$GIS.age
         tableProxy <<- AEGIS::leafletMapping(as.numeric(input$GIS.level), input$GIS.age, input$GIS.distribution, input$country)
 
         idxNum <- paste0("ID_", input$GIS.level)
@@ -385,28 +396,229 @@ shinyApp(
           #Color to fill the polygons
           if (length(tableProxy)==1) {
             pal <- colorQuantile(input$colorsMapping, domain=tableProxy@data$mappingEstimate,
-                                 n=0, probs = seq(0, 1, length.out = 1), na.color = "#FFFFFF",
+                                 n=1, probs = seq(0, 1, length.out = 2), na.color = "#FFFFFF",
                                  alpha = FALSE, reverse = FALSE)
           } else {
-            pal <- colorQuantile(input$colorsMapping, domain=tableProxy@data$mappingEstimate,
-                                 n=7, probs = seq(0, 1, length.out = 8), na.color = "#FFFFFF",
-                                 alpha = FALSE, reverse = FALSE)
+            # pal <- colorQuantile(input$colorsMapping, domain=tableProxy@data$mappingEstimate,
+            #                      n=10, probs = seq(0, 1, length.out = 11), na.color = "#FFFFFF",
+            #                      alpha = FALSE, reverse = FALSE)
+
+            quantileNum <- 10
+
+            probs <- seq(0, 1, length.out = quantileNum + 1)
+            bins <- quantile(tableProxy@data$mappingEstimate, probs, na.rm = TRUE, names = FALSE)
+
+            while (length(unique(bins)) != length(bins)) {
+              quantileNum <- quantileNum - 1
+              probs <- seq(0, 1, length.out = quantileNum + 1)
+              bins <- quantile(tableProxy@data$mappingEstimate, probs, na.rm = TRUE, names = FALSE)
+            }
+
+            pal <- colorBin(input$colorsMapping, bins = bins)
+
           }
 
           #Estimates into pop up objects
-          if (input$GIS.age == "yes"){
-            polygon_popup <- paste0("<strong>Name: </strong>", tableProxy@data[,idxName], "<br>",
-                                    "<strong>Target: </strong>", tableProxy@data$target_count, "<br>",
-                                    "<strong>Outcome: </strong>", tableProxy@data$outcome_count, "<br>",
-                                    "<strong>SIR: </strong>", round(tableProxy@data$std_sir, 2), " (", round(tableProxy@data$std_sirlower, 2), "-", round(tableProxy@data$std_sirupper, 2), ")", "<br>",
-                                    "<strong>Proportion: </strong>", round(tableProxy@data$std_prop, 2), " (", round(tableProxy@data$std_proplower, 2), "-", round(tableProxy@data$std_propupper, 2), ")")
-          } else {
-            polygon_popup <- paste0("<strong>Name: </strong>", tableProxy@data[,idxName], "<br>",
+          # if (input$GIS.age == "yes"){
+          #   polygon_popup <- paste0("<strong>Name: </strong>", tableProxy@data[,idxName], "<br>",
+          #                           "<strong>Target: </strong>", tableProxy@data$target_count, "<br>",
+          #                           "<strong>Outcome: </strong>", tableProxy@data$outcome_count, "<br>",
+          #                           "<strong>SIR: </strong>", round(tableProxy@data$std_sir, 2), " (", round(tableProxy@data$std_sirlower, 2), "-", round(tableProxy@data$std_sirupper, 2), ")", "<br>",
+          #                           "<strong>Proportion: </strong>", round(tableProxy@data$std_prop, 2), " (", round(tableProxy@data$std_proplower, 2), "-", round(tableProxy@data$std_propupper, 2), ")")
+          # } else {
+          #   polygon_popup <- paste0("<strong>Name: </strong>", tableProxy@data[,idxName], "<br>",
+          #                           "<strong>Target: </strong>", tableProxy@data$target_count, "<br>",
+          #                           "<strong>Outcome: </strong>", tableProxy@data$outcome_count, "<br>",
+          #                           "<strong>SIR: </strong>", round(tableProxy@data$crd_sir, 2), " (", round(tableProxy@data$crd_sirlower, 2), "-", round(tableProxy@data$crd_sirupper, 2), ")", "<br>",
+          #                           "<strong>Proportion: </strong>", round(tableProxy@data$crd_prop, 2), " (", round(tableProxy@data$crd_proplower, 2), "-", round(tableProxy@data$crd_propupper, 2), ")")
+          # }
+        if (input$GIS.age == "yes"){
+          polygon_popup <- paste0("<html> <head>
+                                   <style>
+                                   .leaflet-popup {
+                                   position: absolute;
+                                   text-align: center;
+                                   margin-bottom: 20px;
+                                   }
+                                   .leaflet-popup-content-wrapper {
+                                   padding: 1px;
+                                   text-align: left;
+                                   border-radius: 12px;
+                                   }
+                                   .leaflet-popup-content {
+                                   margin: 13px 19px;
+                                   line-height: 1.4;
+                                   }
+                                   .leaflet-popup-content p {
+                                   margin: 18px 0;
+                                   }
+                                   .leaflet-popup-tip-container {
+                                   width: 40px;
+                                   height: 20px;
+                                   position: absolute;
+                                   left: 50%;
+                                   margin-left: -20px;
+                                   overflow: hidden;
+                                   pointer-events: none;
+                                   }
+                                   .leaflet-popup-tip {
+                                   width: 17px;
+                                   height: 17px;
+                                   padding: 1px;
+
+                                   margin: -10px auto 0;
+
+                                   -webkit-transform: rotate(45deg);
+                                   -moz-transform: rotate(45deg);
+                                   -ms-transform: rotate(45deg);
+                                   -o-transform: rotate(45deg);
+                                   transform: rotate(45deg);
+                                   }
+                                   .leaflet-popup-content-wrapper {
+                                   background: white;
+                                   color: #333;
+                                   box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+                                   }
+                                   .leaflet-popup-tip {
+                                   background: white;
+                                   color: #333;
+                                   box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+                                   }
+                                   .leaflet-container a.leaflet-popup-close-button {
+                                   position: absolute;
+                                   top: 0;
+                                   right: 0;
+                                   padding: 4px 4px 0 0;
+                                   border: none;
+                                   text-align: center;
+                                   width: 18px;
+                                   height: 14px;
+                                   font: 16px/14px Tahoma, Verdana, sans-serif;
+                                   color: #c3c3c3;
+                                   text-decoration: none;
+                                   font-weight: bold;
+                                   background: transparent;
+                                   }
+                                   .leaflet-container a.leaflet-popup-close-button:hover {
+                                   color: #999;
+                                   }
+                                   .leaflet-popup-scrolled {
+                                   overflow: auto;
+                                   border-bottom: 1px solid #ddd;
+                                   border-top: 1px solid #ddd;
+                                   }
+                                    #mapping{
+                                    font-size: 18px;
+                                    }
+                                    }
+                                   </style>
+                                   </head>
+                                   <body>",
+                                  "<div id='mapping'>",
+                                   "<strong>Name: </strong>", tableProxy@data[,idxName], "<br>",
+                                   "<strong>Target: </strong>", tableProxy@data$target_count, "<br>",
+                                   "<strong>Outcome: </strong>", tableProxy@data$outcome_count, "<br>",
+                                   "<strong>SIR: </strong>", round(tableProxy@data$std_sir, 2), " (", round(tableProxy@data$std_sirlower, 2), "-", round(tableProxy@data$std_sirupper, 2), ")", "<br>",
+                                   "<strong>Proportion: </strong>", round(tableProxy@data$std_prop, 2), " (", round(tableProxy@data$std_proplower, 2), "-", round(tableProxy@data$std_propupper, 2), ")",
+                                   "</div>",
+                                   "</body>
+                                   </html> "
+          )
+        } else {
+          polygon_popup <- paste0("<html> <head>
+                                   <style>
+                                   .leaflet-popup {
+                                   position: absolute;
+                                   text-align: center;
+                                   margin-bottom: 20px;
+                                   }
+                                   .leaflet-popup-content-wrapper {
+                                   padding: 1px;
+                                   text-align: left;
+                                   border-radius: 12px;
+                                   }
+                                   .leaflet-popup-content {
+                                   margin: 13px 19px;
+                                   line-height: 1.4;
+                                   }
+                                   .leaflet-popup-content p {
+                                   margin: 18px 0;
+                                   }
+                                   .leaflet-popup-tip-container {
+                                   width: 40px;
+                                   height: 20px;
+                                   position: absolute;
+                                   left: 50%;
+                                   margin-left: -20px;
+                                   overflow: hidden;
+                                   pointer-events: none;
+                                   }
+                                   .leaflet-popup-tip {
+                                   width: 17px;
+                                   height: 17px;
+                                   padding: 1px;
+
+                                   margin: -10px auto 0;
+
+                                   -webkit-transform: rotate(45deg);
+                                   -moz-transform: rotate(45deg);
+                                   -ms-transform: rotate(45deg);
+                                   -o-transform: rotate(45deg);
+                                   transform: rotate(45deg);
+                                   }
+                                   .leaflet-popup-content-wrapper {
+                                   background: white;
+                                   color: #333;
+                                   box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+                                   }
+                                   .leaflet-popup-tip {
+                                   background: white;
+                                   color: #333;
+                                   box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+                                   }
+                                   .leaflet-container a.leaflet-popup-close-button {
+                                   position: absolute;
+                                   top: 0;
+                                   right: 0;
+                                   padding: 4px 4px 0 0;
+                                   border: none;
+                                   text-align: center;
+                                   width: 18px;
+                                   height: 14px;
+                                   font: 16px/14px Tahoma, Verdana, sans-serif;
+                                   color: #c3c3c3;
+                                   text-decoration: none;
+                                   font-weight: bold;
+                                   background: transparent;
+                                   }
+                                   .leaflet-container a.leaflet-popup-close-button:hover {
+                                   color: #999;
+                                   }
+                                   .leaflet-popup-scrolled {
+                                   overflow: auto;
+                                   border-bottom: 1px solid #ddd;
+                                   border-top: 1px solid #ddd;
+                                   }
+                                    #mapping{
+                                    font-size: 18px;
+                                    }
+                                   </style>
+                                   </head>
+                                   <body>",
+                                  "<div id='mapping'>",
+                                    "<strong>Name: </strong>", tableProxy@data[,idxName], "<br>",
                                     "<strong>Target: </strong>", tableProxy@data$target_count, "<br>",
                                     "<strong>Outcome: </strong>", tableProxy@data$outcome_count, "<br>",
                                     "<strong>SIR: </strong>", round(tableProxy@data$crd_sir, 2), " (", round(tableProxy@data$crd_sirlower, 2), "-", round(tableProxy@data$crd_sirupper, 2), ")", "<br>",
-                                    "<strong>Proportion: </strong>", round(tableProxy@data$crd_prop, 2), " (", round(tableProxy@data$crd_proplower, 2), "-", round(tableProxy@data$crd_propupper, 2), ")")
+                                    "<strong>Proportion: </strong>", round(tableProxy@data$crd_prop, 2), " (", round(tableProxy@data$crd_proplower, 2), "-", round(tableProxy@data$crd_propupper, 2), ")",
+                                  "</div>",
+                                  "</body>
+                                   </html> ")
           }
+
+
+
+
           #Incremental changes to the map
           leafletProxy("GIS.leafletMapping", data = tableProxy) %>%
             clearShapes() %>%
@@ -435,14 +647,122 @@ shinyApp(
 
 
       #Estimates into pop up objects
-      clustertableProxy <- leafletClustering(input$parameter, input$GIS.age, as.numeric(input$GIS.level), input$colorsClustering)
+      clustertableProxy <- leafletClustering(input$Cluster.parameter, input$GIS.age, as.numeric(input$GIS.level), input$colorsClustering)
 
-      clusterpolygon_popup <- paste0("<strong>population: </strong>", tempGADM@data$population,"<br>",
-                              "<strong>number.of.cases: </strong>", tempGADM@data$number.of.cases,"<br>",
-                              "<strong>expected.cases: </strong>", round(tempGADM@data$expected.cases,4),"<br>",
-                              "<strong>SMR: </strong>", round(tempGADM@data$SMR,4),"<br>",
-                              "<strong>log.likelihood.ratio: </strong>", round(tempGADM@data$log.likelihood.ratio,4),"<br>",
-                              "<strong>p.value: </strong>", round(tempGADM@data$p.value,3),"<br>"
+      if (max(na.omit(clustertableProxy@data$k.cluster))==1) {
+        pal <- colorQuantile(input$colorsClustering, domain=tableProxy@data$mappingEstimate,
+                             n=1, probs = seq(0, 1, length.out = 2), na.color = "#FFFFFF",
+                             alpha = FALSE, reverse = FALSE)
+      } else {
+        quantileNum <- 10
+
+        probs <- seq(0, 1, length.out = quantileNum + 1)
+        bins <- quantile(tableProxy@data$mappingEstimate, probs, na.rm = TRUE, names = FALSE)
+
+        while (length(unique(bins)) != length(bins)) {
+          quantileNum <- quantileNum - 1
+          probs <- seq(0, 1, length.out = quantileNum + 1)
+          bins <- quantile(tableProxy@data$mappingEstimate, probs, na.rm = TRUE, names = FALSE)
+        }
+
+        pal <- colorBin(input$colorsClustering, bins = bins)
+      }
+
+      clusterpolygon_popup <- paste0("<html> <head>
+                                   <style>
+                                     .leaflet-popup {
+                                     position: absolute;
+                                     text-align: center;
+                                     margin-bottom: 20px;
+                                     }
+                                     .leaflet-popup-content-wrapper {
+                                     padding: 1px;
+                                     text-align: left;
+                                     border-radius: 12px;
+                                     }
+                                     .leaflet-popup-content {
+                                     margin: 13px 19px;
+                                     line-height: 1.4;
+                                     }
+                                     .leaflet-popup-content p {
+                                     margin: 18px 0;
+                                     }
+                                     .leaflet-popup-tip-container {
+                                     width: 40px;
+                                     height: 20px;
+                                     position: absolute;
+                                     left: 50%;
+                                     margin-left: -20px;
+                                     overflow: hidden;
+                                     pointer-events: none;
+                                     }
+                                     .leaflet-popup-tip {
+                                     width: 17px;
+                                     height: 17px;
+                                     padding: 1px;
+
+                                     margin: -10px auto 0;
+
+                                     -webkit-transform: rotate(45deg);
+                                     -moz-transform: rotate(45deg);
+                                     -ms-transform: rotate(45deg);
+                                     -o-transform: rotate(45deg);
+                                     transform: rotate(45deg);
+                                     }
+                                     .leaflet-popup-content-wrapper {
+                                     background: white;
+                                     color: #333;
+                                     box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+                                     }
+                                     .leaflet-popup-tip {
+                                     background: white;
+                                     color: #333;
+                                     box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+                                     }
+                                     .leaflet-container a.leaflet-popup-close-button {
+                                     position: absolute;
+                                     top: 0;
+                                     right: 0;
+                                     padding: 4px 4px 0 0;
+                                     border: none;
+                                     text-align: center;
+                                     width: 18px;
+                                     height: 14px;
+                                     font: 16px/14px Tahoma, Verdana, sans-serif;
+                                     color: #c3c3c3;
+                                     text-decoration: none;
+                                     font-weight: bold;
+                                     background: transparent;
+                                     }
+                                     .leaflet-container a.leaflet-popup-close-button:hover {
+                                     color: #999;
+                                     }
+                                     .leaflet-popup-scrolled {
+                                     overflow: auto;
+                                     border-bottom: 1px solid #ddd;
+                                     border-top: 1px solid #ddd;
+                                     }
+                                     </style>
+                                     </head>
+                                     <body>",
+                                     "<strong>Cluster: </strong>", clustertableProxy@data$k.cluster,"<br>",
+                                      "<strong>population: </strong>", clustertableProxy@data$population,"<br>",
+                                     "<strong>number.of.cases: </strong>", clustertableProxy@data$number.of.cases,"<br>",
+                                     "<strong>expected.cases: </strong>", round(clustertableProxy@data$expected.cases,4),"<br>",
+                                     "<strong>SMR: </strong>", round(clustertableProxy@data$SMR,4),"<br>",
+                                     "<strong>log.likelihood.ratio: </strong>", round(clustertableProxy@data$log.likelihood.ratio,4),"<br>",
+                                     "<strong>p.value: </strong>", round(clustertableProxy@data$p.value,3),"<br>"
+                                    ,"</body>
+                                    </html> ")
+
+
+        paste0("<strong>Cluster: </strong>", clustertableProxy@data$k.cluster,"<br>",
+                              "<strong>population: </strong>", clustertableProxy@data$population,"<br>",
+                              "<strong>number.of.cases: </strong>", clustertableProxy@data$number.of.cases,"<br>",
+                              "<strong>expected.cases: </strong>", round(clustertableProxy@data$expected.cases,4),"<br>",
+                              "<strong>SMR: </strong>", round(clustertableProxy@data$SMR,4),"<br>",
+                              "<strong>log.likelihood.ratio: </strong>", round(clustertableProxy@data$log.likelihood.ratio,4),"<br>",
+                              "<strong>p.value: </strong>", round(clustertableProxy@data$p.value,3),"<br>"
       )
       #Incremental changes to the map
       leafletProxy("GIS.leafletClustering", data = clustertableProxy) %>%
@@ -461,7 +781,7 @@ shinyApp(
             dashArray = "",
             fillOpacity = 0.7,
             bringToFront = TRUE)) %>%
-        addLegend(pal = pal, values = tableProxy@data$k.cluster, opacity = 0.7, title = NULL,
+        addLegend(pal = pal, values = clustertableProxy@data$k.cluster, opacity = 0.7, title = NULL,
                   position = "bottomright")
     })
 
