@@ -1,9 +1,33 @@
-       SELECT t.cohort_definition_id, t.subject_id, t.cohort_start_date, t.cohort_end_date
+       
+
+	  IF OBJECT_ID('tempdb..#including_cohort') IS NOT NULL
+         DROP TABLE #including_cohort
+      IF OBJECT_ID('tempdb..#including_cohort2') IS NOT NULL
+         DROP TABLE #including_cohort2
+      IF OBJECT_ID('tempdb..#including_cohort3') IS NOT NULL
+         DROP TABLE #including_cohort3
+      IF OBJECT_ID('tempdb..#target_cohort') IS NOT NULL
+         DROP TABLE #target_cohort
+      IF OBJECT_ID('tempdb..#outcome_cohort') IS NOT NULL
+         DROP TABLE #outcome_cohort
+      IF OBJECT_ID('tempdb..#location_temp') IS NOT NULL
+         DROP TABLE #location_temp
+      IF OBJECT_ID('tempdb..#location_temp2') IS NOT NULL
+         DROP TABLE #location_temp2
+	  IF OBJECT_ID('tempdb..#location_temp2') IS NOT NULL
+         DROP TABLE #location_temp2
+	  IF OBJECT_ID('tempdb..#location_temp3') IS NOT NULL
+         DROP TABLE #location_temp3
+	  IF OBJECT_ID('tempdb..#location_temp4') IS NOT NULL
+         DROP TABLE #location_temp4
+	   
+	   
+	   SELECT t.cohort_definition_id, t.subject_id, t.cohort_start_date, t.cohort_end_date
        INTO #target_cohort
        FROM
               (
                      SELECT
-                     @distinct subject_id,
+                     distinct subject_id,
                      cohort_definition_id,
                      cohort_start_date,
                      cohort_end_date
@@ -21,7 +45,7 @@
        FROM
               (
                      SELECT
-                     @distinct subject_id,
+                     distinct subject_id,
                      cohort_definition_id,
                      cohort_start_date,
                      cohort_end_date

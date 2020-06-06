@@ -1,43 +1,34 @@
-Call.Cohortlist<-function(connectionDetails, connection, Resultschema, targettab="cohort", cdmVersion="5"){
-  resultDatabaseSchema <- paste0(Resultschema,".dbo")
-  connectionDetails <-connectionDetails
-  connection <- connection
+Call.Cohortlist<-function(WebapiDBserver,WebapiDBschema,Resultschema, targettab="cohort", cdmVersion="5"){
 
   Sys.setlocale(category="LC_CTYPE", locale="C")
-
-  
-  
+  ## Check if a cohort exists
   sql <- "SELECT distinct cohort_definition_id FROM @resultDatabaseSchema.@targettab order by cohort_definition_id"
-  targettab <- targettab
+
   sql <- SqlRender::renderSql(sql,
-                              resultDatabaseSchema=resultDatabaseSchema,
+                              resultDatabaseSchema=Resultschema,
                               targettab=targettab)$sql
   sql <- SqlRender::translateSql(sql,
                                  targetDialect=connectionDetails$dbms)$sql
   cohort<-DatabaseConnector::querySql(connection, sql)
-  
-  sql <- "use @Resultschema select * from information_schema.tables"
+
+  ##Check Cohort Definition
+  sql <- 'SELECT name,id FROM @WebapiDBserver@WebapiDBschema.cohort_definition'
   sql <- SqlRender::renderSql(sql,
-                              Resultschema=Resultschema)$sql
+                              WebapiDBserver=if(WebapiDBserver==''){WebapiDBserver=''}else(WebapiDBserver= paste0('[',WebapiDBserver,']','.')),
+                              WebapiDBschema=WebapiDBschema)$sql
   sql <- SqlRender::translateSql(sql,
                                  targetDialect=connectionDetails$dbms)$sql
-  tablelist <- DatabaseConnector::querySql(connection, sql)
-  tablelist$TABLE_NAME <- tolower(tablelist$TABLE_NAME)
+  cohortName<-DatabaseConnector::querySql(connection, sql)
 
-  
-  if (isTRUE(which(tablelist[,3] %in% "cohort_definition") >= 1) == TRUE) {
-          sql <- "SELECT distinct name, id FROM @resultDatabaseSchema.cohort_definition"
-          sql <- SqlRender::renderSql(sql,
-                                      resultDatabaseSchema=resultDatabaseSchema)$sql
-          sql <- SqlRender::translateSql(sql,
-                                         targetDialect=connectionDetails$dbms)$sql
-          cohortname <- DatabaseConnector::querySql(connection, sql)
-          
-          cohortlist <- dplyr::left_join(cohort, cohortname, by = c("COHORT_DEFINITION_ID" = "ID"))
-          cohortlist$cohortname <- paste(cohortlist$COHORT_DEFINITION_ID, cohortlist$NAME, sep="; ")
-        } else {
-          cohortlist <- cohort
-        }
+  ## Print List
+  cohortList <- cbind(cohortName,'exists' = rep('Cohort does not exist',nrow(cohortName)))
+  cohortList$exists <- as.character(cohortList$exists)
+  for(i in cohort$COHORT_DEFINITION_ID){
+    cohortList$exists[cohortList$ID == i] <- 'Cohort exists'
+  }
 
-  return(cohortlist)
+  cohortList <- paste(cohortList$ID,cohortList$NAME,'(',cohortList$exists,')')
+
+  return(cohortList)
 }
+

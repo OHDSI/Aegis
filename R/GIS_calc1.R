@@ -1,6 +1,6 @@
-GIS.calc1 <- function(GIS.level, GIS.distribution, GIS.Age){
+GIS.calc1 <- function(GADM.table,CDM.table, GIS.level, GIS.distribution, GIS.Age){
 
-  df <- dplyr::left_join(GADM.table, CDM.table, by=c("ID_2" = "gadm_id"))
+  df <- dplyr::left_join(GADM.table, CDM.table, by=c(idxNum = "gadm_id"))
   i <- GIS.level
     switch(GIS.Age,
            "no"={
@@ -47,6 +47,7 @@ GIS.calc1 <- function(GIS.level, GIS.distribution, GIS.Age){
 
 
     )
-  countdf_level <- na.omit(temp_df)
+  temp_df[is.na(temp_df[, "target_count"]), "target_count"] <- 0
+  countdf_level <- temp_df
   return(countdf_level)
 }

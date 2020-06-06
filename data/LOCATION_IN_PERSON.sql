@@ -1,10 +1,10 @@
-      --target cohort
+--target cohort
       SELECT t.cohort_definition_id, t.subject_id, t.cohort_start_date, t.cohort_end_date
        INTO #target_cohort
        FROM
          (
            SELECT
-           @distinct subject_id,
+           distinct subject_id,
            cohort_definition_id,
            cohort_start_date,
            cohort_end_date
@@ -15,7 +15,7 @@
        AND '@startdt' <= t.cohort_start_date
        AND '@enddt' >= t.cohort_start_date
        ---- end of setting for target cohort
-       
+
 
 
        --outcome cohort
@@ -24,7 +24,7 @@
        FROM
          (
            SELECT
-           @distinct subject_id,
+           distinct subject_id,
            cohort_definition_id,
            cohort_start_date,
            cohort_end_date
@@ -36,7 +36,7 @@
        --AND '@enddt' >= o.cohort_end_date
 
        ---- end of setting for outcome cohort
-       
+
 
 
        --including cohort
@@ -47,10 +47,10 @@
        ON t.subject_id = o.subject_id
        WHERE t.cohort_start_date <= o.cohort_start_date
        AND t.cohort_end_date >= o.cohort_start_date
-       AND dateadd(day, @timeatrisk_startdt, t.cohort_start_date) <= o.cohort_start_date 
+       AND dateadd(day, @timeatrisk_startdt, t.cohort_start_date) <= o.cohort_start_date
        AND dateadd(day, @timeatrisk_enddt, t.@timeatrisk_enddt_panel) >= o.cohort_end_date
 
-       select a.*,b.location_id, 
+       select a.*,b.location_id,
                      case
                      when year(a.cohort_start_date)-b.year_of_birth >= 79 then 8
                      when year(a.cohort_start_date)-b.year_of_birth > 69 then 7
@@ -75,7 +75,7 @@
        where b.domain_concept_id_1 = 4083586
        order by b.fact_id_2, a.age_cat, a.sex_cat
        ---- end of setting for including cohort
-     
+
 
 
 
@@ -83,13 +83,13 @@
 
 
        ---- person cohort
-       SELECT a.* 
+       SELECT a.*
        into #person_temp
-       FROM @resultDatabaseSchema.cohort a 
-       WHERE COHORT_DEFINITION_ID = 1
+       FROM @resultDatabaseSchema.cohort a
+       WHERE COHORT_DEFINITION_ID = @tcdi
 
 
-       SELECT a.*, b.location_id, 
+       SELECT a.*, b.location_id,
           case
               when year(a.cohort_start_date)-b.year_of_birth >= 79 then 8
               when year(a.cohort_start_date)-b.year_of_birth > 69 then 7
@@ -101,7 +101,7 @@
               when year(a.cohort_start_date)-b.year_of_birth >= 10 then 1
               when year(a.cohort_start_date)-b.year_of_birth <= 9 then 0
           end as age_cat,
-          case 
+          case
               when b.gender_concept_id = '8507' then 0
               when b.gender_concept_id = '8532' then 1
           end as sex_cat
@@ -132,7 +132,7 @@
        ON a.gadm_id = b.gadm_id and a.age_cat = b.age_cat and a.sex_cat = b.sex_cat
        GROUP BY a.gadm_id, a.age_cat, a.sex_cat, a.target_count, b.outcome_count
        ORDER BY a.gadm_id, a.age_cat
-       
+
        DROP TABLE #including_cohort
        DROP TABLE #target_cohort
        DROP TABLE #outcome_cohort

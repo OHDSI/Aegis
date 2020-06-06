@@ -1,0 +1,55 @@
+{
+  "ConceptSets": [
+    {
+      "id": 0,
+      "name": "death",
+      "expression": {
+        "items": [
+          {
+            "concept": {
+              "CONCEPT_ID": 38003618,
+              "CONCEPT_NAME": "Death Certificate underlying cause",
+              "STANDARD_CONCEPT": "S",
+              "STANDARD_CONCEPT_CAPTION": "Standard",
+              "INVALID_REASON": "V",
+              "INVALID_REASON_CAPTION": "Valid",
+              "CONCEPT_CODE": "OMOP generated",
+              "DOMAIN_ID": "Type Concept",
+              "VOCABULARY_ID": "Death Type",
+              "CONCEPT_CLASS_ID": "Death Type"
+            },
+            "includeDescendants": true
+          }
+        ]
+      }
+    }
+  ],
+  "PrimaryCriteria": {
+    "CriteriaList": [
+      {
+        "Death": {}
+      }
+    ],
+    "ObservationWindow": {
+      "PriorDays": 0,
+      "PostDays": 0
+    },
+    "PrimaryCriteriaLimit": {
+      "Type": "First"
+    }
+  },
+  "QualifiedLimit": {
+    "Type": "First"
+  },
+  "ExpressionLimit": {
+    "Type": "First"
+  },
+  "InclusionRules": [],
+  "CensoringCriteria": [],
+  "CollapseSettings": {
+    "CollapseType": "ERA",
+    "EraPad": 0
+  },
+  "CensorWindow": {},
+  "cdmVersionRange": ">=5.0.0"
+}
