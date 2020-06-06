@@ -66,14 +66,14 @@ shinyApp(
                 fluidRow(
                   titlePanel("Database Connection"),
                   sidebarPanel(
-                    textInput("ip","IP","128.1.99.53",placeholder = 'xxx.xxx.xxx.xxx')
+                    textInput("ip","IP","",placeholder = 'xxx.xxx.xxx.xxx')
                     ,uiOutput("sqltype")
-                    ,textInput("CDMschema","CDM Database schema","nhis_nsc.dbo",placeholder = 'yourCdmDb.schema')
-                    ,textInput("Resultschema","CDM Result schema","webapi_2_6_nhis_nsc.results_v27",placeholder = 'yourCdmResultDb.schema')
-                    ,textInput("usr","USER","jhcho")
-                    ,passwordInput("pw","PASSWORD","Survival12")
-                    ,textInput('WebapiDBserver','WebAPI DB Server IP','128.1.99.58',placeholder = 'xxx.xxx.xxx.xxx')
-                    ,textInput('WebapiDBschema','WebAPI DB Schema','webapi_db.webapi_v27',placeholder = 'yourWebAPIDb.schema')
+                    ,textInput("CDMschema","CDM Database schema","",placeholder = 'yourCdmDb.schema')
+                    ,textInput("Resultschema","CDM Result schema","",placeholder = 'yourCdmResultDb.schema')
+                    ,textInput("usr","USER","")
+                    ,passwordInput("pw","PASSWORD","")
+                    ,textInput('WebapiDBserver','WebAPI DB Server IP','',placeholder = 'xxx.xxx.xxx.xxx')
+                    ,textInput('WebapiDBschema','WebAPI DB Schema','',placeholder = 'yourWebAPIDb.schema')
                     ,uiOutput("country_list")
                     #input text to db information
                     ,actionButton("db_load","Load DB")
